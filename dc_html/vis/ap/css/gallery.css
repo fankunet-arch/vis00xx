@@ -4,7 +4,17 @@
  * 说明: 前台视频展示页面样式 - 暗色主题（Mobile First响应式设计）
  */
 
-/* 页面布局 */
+/* 页面布局 - 覆盖common.css的body样式 */
+body {
+    height: auto !important;
+    overflow: visible !important;
+    overflow-y: auto !important;
+}
+
+html {
+    overflow-y: auto;
+}
+
 .gallery-wrapper {
     min-height: 100vh;
     background: var(--bg-app);
@@ -167,7 +177,7 @@
 .video-thumbnail {
     position: relative;
     width: 100%;
-    padding-bottom: 56.25%; /* 16:9 宽高比 */
+    padding-bottom: 177.77%; /* 9:16 竖屏视频比例（抖音） */
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     overflow: hidden;

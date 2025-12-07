@@ -301,7 +301,9 @@ $products = vis_get_products($pdo);
          */
         function extractVideoMetadata(file) {
             const video = document.createElement('video');
-            video.preload = 'metadata';
+            video.preload = 'auto'; // 改为 auto，加载更多数据
+            video.muted = true; // 静音，避免播放声音
+            video.playsInline = true; // 内联播放
 
             // 创建临时 URL
             const videoURL = URL.createObjectURL(file);
@@ -310,30 +312,37 @@ $products = vis_get_products($pdo);
             video.onloadedmetadata = function() {
                 // 获取视频时长（秒，四舍五入）
                 videoDuration = Math.round(video.duration);
-
                 console.log(`视频时长: ${videoDuration} 秒`);
+            };
 
-                // 获取视频首帧作为封面
-                video.currentTime = 0.1; // 定位到0.1秒（避免全黑帧）
+            // 等待视频可以播放后再截图
+            video.onloadeddata = function() {
+                // 先播放一小段，确保视频帧加载
+                video.currentTime = Math.min(1, video.duration * 0.1); // 10%位置或1秒
             };
 
             video.onseeked = function() {
                 try {
-                    // 使用 Canvas 截取视频帧
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    // 等待下一帧渲染
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            // 使用 Canvas 截取视频帧
+                            const canvas = document.createElement('canvas');
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
 
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                    // 转换为 Base64（JPEG 格式，质量 0.8）
-                    videoCoverBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                            // 转换为 Base64（JPEG 格式，质量 0.8）
+                            videoCoverBase64 = canvas.toDataURL('image/jpeg', 0.8);
 
-                    console.log('封面图已生成');
+                            console.log('封面图已生成，尺寸:', canvas.width, 'x', canvas.height);
 
-                    // 释放临时 URL
-                    URL.revokeObjectURL(videoURL);
+                            // 释放临时 URL
+                            URL.revokeObjectURL(videoURL);
+                        });
+                    });
                 } catch (error) {
                     console.error('封面图生成失败:', error);
                     // 不中断上传流程，继续不带封面上传
