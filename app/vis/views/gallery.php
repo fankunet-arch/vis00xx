@@ -301,9 +301,10 @@ $platformNames = [
                 const result = await response.json();
 
                 // 关闭加载提示
-                modal.close(false);
+                // modal.close(false);  <--- 注释掉或删除这一行
 
                 if (!result.success) {
+                    // 如果出错，这里showAlert会覆盖加载框，也是安全的
                     showAlert(result.message, '错误', 'error');
                     return;
                 }
