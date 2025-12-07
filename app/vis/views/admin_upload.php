@@ -291,69 +291,103 @@ $products = vis_get_products($pdo);
             fileSelected.style.display = 'block';
             uploadArea.style.display = 'none';
 
+            // [新增] 1. 立即禁用上传按钮，防止在截图生成前提交
+            submitBtn.disabled = true;
+            const originalBtnText = submitBtn.textContent;
+            submitBtn.textContent = '正在生成封面...';
+            submitBtn.dataset.originalText = originalBtnText; // 暂存原始文本
+
             // 提取视频元数据（时长和封面图）
             extractVideoMetadata(file);
         }
 
-        /**
+/**
          * 提取视频元数据（时长和首帧封面）
-         * @param {File} file - 视频文件
+         * 增加超时保险，防止手机端卡死
          */
         function extractVideoMetadata(file) {
             const video = document.createElement('video');
-            video.preload = 'auto'; // 改为 auto，加载更多数据
-            video.muted = true; // 静音，避免播放声音
-            video.playsInline = true; // 内联播放
+            video.preload = 'auto';
+            video.muted = true;
+            video.playsInline = true; // 关键：iOS 必须属性
 
             // 创建临时 URL
             const videoURL = URL.createObjectURL(file);
             video.src = videoURL;
 
+            // [新增] 1. 定义清理和恢复函数
+            // 无论成功、失败还是超时，最后都要执行这个，确保按钮恢复
+            const finishProcess = (isSuccess) => {
+                // 清除超时计时器
+                if (video.dataset.timeoutId) {
+                    clearTimeout(parseInt(video.dataset.timeoutId));
+                }
+                
+                // 释放资源
+                if (video.src) {
+                    URL.revokeObjectURL(video.src);
+                    video.removeAttribute('src');
+                }
+                
+                // 恢复按钮状态
+                if (submitBtn.disabled) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = submitBtn.dataset.originalText || '上传视频';
+                }
+            };
+
+            // [新增] 2. 设置 3 秒超时保险
+            // 如果手机浏览器 3 秒内没搞定封面，就放弃生成，让用户能继续上传
+            video.dataset.timeoutId = setTimeout(() => {
+                console.warn('生成封面超时，跳过封面生成步骤');
+                finishProcess(false);
+            }, 3000);
+
             video.onloadedmetadata = function() {
-                // 获取视频时长（秒，四舍五入）
                 videoDuration = Math.round(video.duration);
                 console.log(`视频时长: ${videoDuration} 秒`);
             };
 
-            // 等待视频可以播放后再截图
             video.onloadeddata = function() {
-                // 先播放一小段，确保视频帧加载
-                video.currentTime = Math.min(1, video.duration * 0.1); // 10%位置或1秒
+                // 尝试跳转到 10% 或 1秒处
+                const seekTime = Math.min(1, video.duration * 0.1);
+                video.currentTime = seekTime;
             };
 
             video.onseeked = function() {
                 try {
-                    // 等待下一帧渲染
+                    // 等待渲染，手机上可能需要更宽松的等待
                     requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            // 使用 Canvas 截取视频帧
-                            const canvas = document.createElement('canvas');
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
-
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                            // 转换为 Base64（JPEG 格式，质量 0.8）
-                            videoCoverBase64 = canvas.toDataURL('image/jpeg', 0.8);
-
-                            console.log('封面图已生成，尺寸:', canvas.width, 'x', canvas.height);
-
-                            // 释放临时 URL
-                            URL.revokeObjectURL(videoURL);
-                        });
+                        setTimeout(() => { // 加一个小延时兼容低端机
+                            try {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = video.videoWidth;
+                                canvas.height = video.videoHeight;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                
+                                videoCoverBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                                console.log('封面图生成成功');
+                            } catch (err) {
+                                console.error('绘图失败:', err);
+                            }
+                            // 成功完成，触发清理
+                            finishProcess(true);
+                        }, 50);
                     });
                 } catch (error) {
-                    console.error('封面图生成失败:', error);
-                    // 不中断上传流程，继续不带封面上传
-                    URL.revokeObjectURL(videoURL);
+                    console.error('截图过程异常:', error);
+                    finishProcess(false);
                 }
             };
 
             video.onerror = function() {
-                console.error('视频元数据加载失败');
-                URL.revokeObjectURL(videoURL);
+                console.error('视频加载出错');
+                finishProcess(false);
             };
+
+            // [新增] 3. 显式调用 load()，刺激部分手机浏览器开始加载
+            video.load();
         }
 
         function removeFile() {
@@ -363,6 +397,10 @@ $products = vis_get_products($pdo);
             fileInput.value = '';
             fileSelected.style.display = 'none';
             uploadArea.style.display = 'block';
+            
+            // [新增] 重置按钮状态
+            submitBtn.disabled = false;
+            submitBtn.textContent = '上传视频';
         }
 
         // 产品名称输入框处理
