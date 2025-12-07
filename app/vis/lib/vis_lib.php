@@ -518,8 +518,19 @@ function vis_delete_video($pdo, $id) {
         ");
         $stmt->execute(['id' => $id]);
 
-        // 删除R2文件
+        // 1. 删除R2视频主文件
         $r2Result = vis_delete_from_r2($video['r2_key']);
+
+        // 2. [新增] 删除R2封面文件
+        // 逻辑：将视频路径后缀（如 .mp4）替换为 .jpg
+        // 例如：vis/202312/uuid.mp4 -> vis/202312/uuid.jpg
+        $coverKey = preg_replace('/\.[^.]+$/', '.jpg', $video['r2_key']);
+        
+        // 确保生成的key有效且不等于原key（防止误删非扩展名文件）
+        if ($coverKey && $coverKey !== $video['r2_key']) {
+             // 尝试删除封面，即使文件不存在（S3协议返回204）也视为成功，不影响主流程
+             vis_delete_from_r2($coverKey);
+        }
 
         if (!$r2Result['success']) {
             // 如果R2删除失败，记录日志但不回滚数据库操作
