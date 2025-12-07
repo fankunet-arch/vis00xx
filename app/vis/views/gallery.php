@@ -13,6 +13,9 @@ if (!defined('VIS_ENTRY')) {
 // 获取筛选参数
 $category = $_GET['category'] ?? '';
 $platform = $_GET['platform'] ?? '';
+$productId = $_GET['product_id'] ?? '';
+$seriesId = $_GET['series_id'] ?? '';
+$seasonId = $_GET['season_id'] ?? '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $limit = 12;
 $offset = ($page - 1) * $limit;
@@ -25,14 +28,38 @@ if (!empty($category)) {
 if (!empty($platform)) {
     $filters['platform'] = $platform;
 }
+if (!empty($productId)) {
+    $filters['product_id'] = $productId;
+}
+if (!empty($seriesId)) {
+    $filters['series_id'] = $seriesId;
+}
+if (!empty($seasonId)) {
+    $filters['season_id'] = $seasonId;
+}
 
 // 获取视频列表
 $videos = vis_get_videos($pdo, $filters, $limit, $offset);
 $totalVideos = vis_get_videos_count($pdo, $filters);
 $totalPages = ceil($totalVideos / $limit);
 
-// 获取分类列表
+// 获取内容类型列表
 $categories = vis_get_categories($pdo);
+// 获取产品、系列、季节列表
+$products = vis_get_products($pdo);
+$series = vis_get_series($pdo);
+$seasons = vis_get_seasons($pdo);
+
+// 创建映射表（便于显示）
+$productMap = [];
+foreach ($products as $prod) {
+    $productMap[$prod['id']] = $prod['product_name'];
+}
+
+$seasonMap = [];
+foreach ($seasons as $season) {
+    $seasonMap[$season['id']] = $season['season_name'];
+}
 
 // 平台名称映射
 $platformNames = [
@@ -69,11 +96,61 @@ $platformNames = [
                 <div class="gallery-filters">
                     <form method="GET" action="/vis/index.php">
                         <input type="hidden" name="action" value="gallery">
-                        <div class="filter-row">
+
+                        <!-- 第一行：产品、系列、季节（核心筛选） -->
+                        <div class="filter-row" style="margin-bottom: 12px;">
                             <div class="filter-group">
-                                <label class="filter-label">分类</label>
+                                <label class="filter-label">📦 系列</label>
+                                <select name="series_id" id="seriesFilter" class="filter-select">
+                                    <option value="">全部系列</option>
+                                    <?php foreach ($series as $s): ?>
+                                        <option value="<?php echo $s['id']; ?>"
+                                            <?php echo $seriesId == $s['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($s['series_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label class="filter-label">🔍 产品</label>
+                                <select name="product_id" id="productFilter" class="filter-select">
+                                    <option value="">全部产品</option>
+                                    <?php foreach ($products as $prod): ?>
+                                        <option value="<?php echo $prod['id']; ?>"
+                                            data-series-id="<?php echo $prod['series_id'] ?? ''; ?>"
+                                            <?php echo $productId == $prod['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($prod['product_name']); ?>
+                                            <?php if (!empty($prod['series_name'])): ?>
+                                                (<?php echo htmlspecialchars($prod['series_name']); ?>)
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label class="filter-label">🌸 季节</label>
+                                <select name="season_id" class="filter-select">
+                                    <option value="">全部季节</option>
+                                    <?php foreach ($seasons as $season): ?>
+                                        <option value="<?php echo $season['id']; ?>"
+                                            <?php echo $seasonId == $season['id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($season['season_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="filter-btn">筛选</button>
+                        </div>
+
+                        <!-- 第二行：内容类型、平台（辅助筛选） -->
+                        <div class="filter-row filter-row-secondary">
+                            <div class="filter-group">
+                                <label class="filter-label">类型</label>
                                 <select name="category" class="filter-select">
-                                    <option value="">全部分类</option>
+                                    <option value="">全部类型</option>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?php echo htmlspecialchars($cat['category_code']); ?>"
                                             <?php echo $category === $cat['category_code'] ? 'selected' : ''; ?>>
@@ -94,7 +171,9 @@ $platformNames = [
                                 </select>
                             </div>
 
-                            <button type="submit" class="filter-btn">筛选</button>
+                            <button type="button" class="filter-btn filter-btn-reset" onclick="location.href='/vis/index.php?action=gallery'">
+                                重置
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -130,7 +209,16 @@ $platformNames = [
                                 <div class="video-info">
                                     <h3 class="video-title"><?php echo htmlspecialchars($video['title']); ?></h3>
                                     <div class="video-meta">
-                                        <span class="video-badge category"><?php echo htmlspecialchars($video['category']); ?></span>
+                                        <?php if (!empty($video['product_id']) && isset($productMap[$video['product_id']])): ?>
+                                            <span class="video-badge" style="background: #e8f5e9; color: #2e7d32;">
+                                                🍵 <?php echo htmlspecialchars($productMap[$video['product_id']]); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($video['season_id']) && isset($seasonMap[$video['season_id']])): ?>
+                                            <span class="video-badge" style="background: #fce4ec; color: #c2185b;">
+                                                🌸 <?php echo htmlspecialchars($seasonMap[$video['season_id']]); ?>
+                                            </span>
+                                        <?php endif; ?>
                                         <span class="video-badge platform-<?php echo $video['platform']; ?>">
                                             <?php echo $platformNames[$video['platform']] ?? $video['platform']; ?>
                                         </span>
@@ -143,22 +231,40 @@ $platformNames = [
 
                     <!-- 分页 -->
                     <?php if ($totalPages > 1): ?>
+                        <?php
+                        // 构建分页URL参数
+                        $paginationParams = [
+                            'action' => 'gallery',
+                            'category' => $category,
+                            'platform' => $platform,
+                            'product_id' => $productId,
+                            'series_id' => $seriesId,
+                            'season_id' => $seasonId,
+                        ];
+                        // 移除空参数
+                        $paginationParams = array_filter($paginationParams, function($v) { return $v !== ''; });
+
+                        function buildPaginationUrl($params, $page) {
+                            $params['page'] = $page;
+                            return '?' . http_build_query($params);
+                        }
+                        ?>
                         <div class="pagination">
                             <?php if ($page > 1): ?>
-                                <button class="pagination-btn" onclick="location.href='?action=gallery&category=<?php echo urlencode($category); ?>&platform=<?php echo urlencode($platform); ?>&page=<?php echo $page - 1; ?>'">
+                                <button class="pagination-btn" onclick="location.href='<?php echo buildPaginationUrl($paginationParams, $page - 1); ?>'">
                                     上一页
                                 </button>
                             <?php endif; ?>
 
                             <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
                                 <button class="pagination-btn <?php echo $i === $page ? 'active' : ''; ?>"
-                                    onclick="location.href='?action=gallery&category=<?php echo urlencode($category); ?>&platform=<?php echo urlencode($platform); ?>&page=<?php echo $i; ?>'">
+                                    onclick="location.href='<?php echo buildPaginationUrl($paginationParams, $i); ?>'">
                                     <?php echo $i; ?>
                                 </button>
                             <?php endfor; ?>
 
                             <?php if ($page < $totalPages): ?>
-                                <button class="pagination-btn" onclick="location.href='?action=gallery&category=<?php echo urlencode($category); ?>&platform=<?php echo urlencode($platform); ?>&page=<?php echo $page + 1; ?>'">
+                                <button class="pagination-btn" onclick="location.href='<?php echo buildPaginationUrl($paginationParams, $page + 1); ?>'">
                                     下一页
                                 </button>
                             <?php endif; ?>
@@ -231,6 +337,64 @@ $platformNames = [
                 return false;
             }
         });
+
+        // 级联筛选逻辑（系列 → 产品）
+        const seriesFilter = document.getElementById('seriesFilter');
+        const productFilter = document.getElementById('productFilter');
+
+        // 保存所有产品选项
+        const allProductOptions = Array.from(productFilter.options).slice(1); // 排除"全部产品"选项
+        const currentProductId = '<?php echo $productId; ?>';
+        const currentSeriesId = '<?php echo $seriesId; ?>';
+
+        // 系列选择变化时，过滤产品列表
+        seriesFilter.addEventListener('change', function() {
+            const selectedSeriesId = this.value;
+
+            // 移除除"全部产品"外的所有选项
+            while (productFilter.options.length > 1) {
+                productFilter.remove(1);
+            }
+
+            // 重新添加符合条件的产品
+            if (selectedSeriesId === '') {
+                // 未选择系列，显示所有产品
+                allProductOptions.forEach(option => {
+                    productFilter.add(option.cloneNode(true));
+                });
+            } else {
+                // 选择了系列，只显示该系列的产品
+                allProductOptions.forEach(option => {
+                    if (option.dataset.seriesId === selectedSeriesId) {
+                        productFilter.add(option.cloneNode(true));
+                    }
+                });
+            }
+
+            // 重置产品选择
+            productFilter.value = '';
+        });
+
+        // 产品选择变化时，自动选择对应系列（可选功能）
+        productFilter.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.dataset.seriesId) {
+                // 可选：自动同步系列选择
+                // seriesFilter.value = selectedOption.dataset.seriesId;
+            }
+        });
+
+        // 页面加载时，如果已选择系列，过滤产品列表
+        if (currentSeriesId) {
+            // 触发过滤
+            const event = new Event('change');
+            seriesFilter.dispatchEvent(event);
+
+            // 恢复当前选中的产品
+            if (currentProductId) {
+                productFilter.value = currentProductId;
+            }
+        }
     </script>
 </body>
 </html>

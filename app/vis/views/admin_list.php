@@ -13,6 +13,9 @@ if (!defined('VIS_ENTRY')) {
 // 获取筛选参数
 $category = $_GET['category'] ?? '';
 $platform = $_GET['platform'] ?? '';
+$productId = $_GET['product_id'] ?? '';
+$seriesId = $_GET['series_id'] ?? '';
+$seasonId = $_GET['season_id'] ?? '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $limit = 20;
 $offset = ($page - 1) * $limit;
@@ -25,14 +28,40 @@ if (!empty($category)) {
 if (!empty($platform)) {
     $filters['platform'] = $platform;
 }
+if (!empty($productId)) {
+    $filters['product_id'] = $productId;
+}
+if (!empty($seriesId)) {
+    $filters['series_id'] = $seriesId;
+}
+if (!empty($seasonId)) {
+    $filters['season_id'] = $seasonId;
+}
 
 // 获取视频列表和总数
 $videos = vis_get_videos($pdo, $filters, $limit, $offset);
 $totalVideos = vis_get_videos_count($pdo, $filters);
 $totalPages = ceil($totalVideos / $limit);
 
-// 获取分类列表
+// 获取内容类型、产品、系列、季节列表
 $categories = vis_get_categories($pdo);
+$products = vis_get_products($pdo);
+$series = vis_get_series($pdo);
+$seasons = vis_get_seasons($pdo);
+
+// 创建查找映射（用于显示名称）
+$productMap = [];
+foreach ($products as $prod) {
+    $productMap[$prod['id']] = $prod['product_name'];
+}
+$seriesMap = [];
+foreach ($series as $s) {
+    $seriesMap[$s['id']] = $s['series_name'];
+}
+$seasonMap = [];
+foreach ($seasons as $season) {
+    $seasonMap[$season['id']] = $season['season_name'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -78,10 +107,22 @@ $categories = vis_get_categories($pdo);
             </div>
         </aside>
 
+        <!-- 移动端遮罩层 -->
+        <div class="mobile-overlay" id="mobileOverlay"></div>
+
         <!-- 主区域 -->
         <main class="main-wrapper">
             <!-- 顶部栏 -->
             <header class="admin-header">
+                <!-- 汉堡菜单按钮（仅移动端显示） -->
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+
                 <div class="page-title">全部视频</div>
 
                 <div class="search-container">
@@ -164,6 +205,16 @@ $categories = vis_get_categories($pdo);
                                 <div class="card-info">
                                     <div class="card-title"><?php echo htmlspecialchars($video['title']); ?></div>
                                     <div class="card-meta">
+                                        <?php if (!empty($video['product_id']) && isset($productMap[$video['product_id']])): ?>
+                                            <span class="meta-item" title="产品">
+                                                🍵 <?php echo htmlspecialchars($productMap[$video['product_id']]); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($video['season_id']) && isset($seasonMap[$video['season_id']])): ?>
+                                            <span class="meta-item" title="季节">
+                                                🌸 <?php echo htmlspecialchars($seasonMap[$video['season_id']]); ?>
+                                            </span>
+                                        <?php endif; ?>
                                         <span class="meta-item">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <circle cx="12" cy="12" r="10"></circle>
@@ -196,15 +247,33 @@ $categories = vis_get_categories($pdo);
 
                         <!-- 分页 -->
                         <?php if ($totalPages > 1): ?>
+                            <?php
+                            // 构建分页URL参数
+                            $paginationParams = [
+                                'action' => 'admin_list',
+                                'category' => $category,
+                                'platform' => $platform,
+                                'product_id' => $productId,
+                                'series_id' => $seriesId,
+                                'season_id' => $seasonId,
+                            ];
+                            // 移除空参数
+                            $paginationParams = array_filter($paginationParams, function($v) { return $v !== ''; });
+
+                            function buildAdminPaginationUrl($params, $page) {
+                                $params['page'] = $page;
+                                return '?' . http_build_query($params);
+                            }
+                            ?>
                             <div class="admin-pagination">
                                 <?php if ($page > 1): ?>
-                                    <a href="?action=admin_list&category=<?php echo urlencode($category); ?>&platform=<?php echo urlencode($platform); ?>&page=<?php echo $page - 1; ?>" class="page-btn">上一页</a>
+                                    <a href="<?php echo buildAdminPaginationUrl($paginationParams, $page - 1); ?>" class="page-btn">上一页</a>
                                 <?php endif; ?>
 
                                 <span class="page-info">第 <?php echo $page; ?> / <?php echo $totalPages; ?> 页（共 <?php echo $totalVideos; ?> 个视频）</span>
 
                                 <?php if ($page < $totalPages): ?>
-                                    <a href="?action=admin_list&category=<?php echo urlencode($category); ?>&platform=<?php echo urlencode($platform); ?>&page=<?php echo $page + 1; ?>" class="page-btn">下一页</a>
+                                    <a href="<?php echo buildAdminPaginationUrl($paginationParams, $page + 1); ?>" class="page-btn">下一页</a>
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
@@ -245,9 +314,128 @@ $categories = vis_get_categories($pdo);
         }
 
         // 编辑视频
-        function editVideo(id) {
-            // TODO: 实现编辑功能
-            showAlert('编辑功能开发中', '提示', 'info');
+        async function editVideo(id) {
+            // 获取视频信息
+            const video = <?php echo json_encode($videos); ?>.find(v => v.id == id);
+            if (!video) {
+                showAlert('未找到视频信息', '错误', 'error');
+                return;
+            }
+
+            const categories = <?php echo json_encode($categories); ?>;
+            const products = <?php echo json_encode($products); ?>;
+            const series = <?php echo json_encode($series); ?>;
+            const seasons = <?php echo json_encode($seasons); ?>;
+
+            // 创建表单HTML
+            const formHtml = `
+                <form id="editForm" class="modal-form">
+                    <div class="form-group">
+                        <label class="form-label">视频标题</label>
+                        <input type="text" name="title" class="form-control" value="${video.title}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">产品</label>
+                        <select name="product_id" class="form-select">
+                            <option value="">无关联产品</option>
+                            ${products.map(p => `
+                                <option value="${p.id}" ${video.product_id == p.id ? 'selected' : ''}>
+                                    ${p.product_name}${p.series_name ? ' (' + p.series_name + ')' : ''}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">系列</label>
+                        <select name="series_id" class="form-select">
+                            <option value="">无关联系列</option>
+                            ${series.map(s => `
+                                <option value="${s.id}" ${video.series_id == s.id ? 'selected' : ''}>
+                                    ${s.series_name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">季节</label>
+                        <select name="season_id" class="form-select">
+                            ${seasons.map(se => `
+                                <option value="${se.id}" ${video.season_id == se.id ? 'selected' : ''}>
+                                    ${se.season_name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">内容类型</label>
+                        <select name="category" class="form-select">
+                            ${categories.map(c => `
+                                <option value="${c.category_code}" ${video.category == c.category_code ? 'selected' : ''}>
+                                    ${c.category_name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">来源平台</label>
+                        <select name="platform" class="form-select">
+                            <option value="other" ${video.platform == 'other' ? 'selected' : ''}>其他</option>
+                            <option value="wechat" ${video.platform == 'wechat' ? 'selected' : ''}>微信</option>
+                            <option value="xiaohongshu" ${video.platform == 'xiaohongshu' ? 'selected' : ''}>小红书</option>
+                            <option value="douyin" ${video.platform == 'douyin' ? 'selected' : ''}>抖音</option>
+                        </select>
+                    </div>
+                </form>
+            `;
+
+            const confirmed = await showModal({
+                title: '编辑视频信息',
+                content: formHtml,
+                width: '600px',
+                footer: `
+                    <div class="modal-footer">
+                        <button class="modal-btn modal-btn-secondary" data-action="close">取消</button>
+                        <button class="modal-btn modal-btn-primary" onclick="saveVideoEdit(${id})">保存</button>
+                    </div>
+                `
+            });
+        }
+
+        async function saveVideoEdit(id) {
+            const form = document.getElementById('editForm');
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch('/vis/ap/index.php?action=video_save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: id,
+                        title: formData.get('title'),
+                        category: formData.get('category'),
+                        platform: formData.get('platform'),
+                        product_id: formData.get('product_id') || null,
+                        series_id: formData.get('series_id') || null,
+                        season_id: formData.get('season_id') || null
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(result.message, '成功', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(result.message, '错误', 'error');
+                }
+            } catch (error) {
+                showAlert('保存失败', '错误', 'error');
+            }
         }
 
         // 删除视频
@@ -280,5 +468,6 @@ $categories = vis_get_categories($pdo);
             }
         }
     </script>
+    <script src="/vis/ap/js/mobile-menu.js"></script>
 </body>
 </html>

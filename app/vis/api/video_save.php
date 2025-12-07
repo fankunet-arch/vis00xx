@@ -53,6 +53,19 @@ try {
         $updateData['platform'] = trim($input['platform']);
     }
 
+    // 产品、系列、季节字段（允许为空）
+    if (isset($input['product_id'])) {
+        $updateData['product_id'] = !empty($input['product_id']) ? (int)$input['product_id'] : null;
+    }
+
+    if (isset($input['series_id'])) {
+        $updateData['series_id'] = !empty($input['series_id']) ? (int)$input['series_id'] : null;
+    }
+
+    if (isset($input['season_id'])) {
+        $updateData['season_id'] = !empty($input['season_id']) ? (int)$input['season_id'] : null;
+    }
+
     // 验证是否有需要更新的字段
     if (empty($updateData)) {
         vis_json_response(false, null, '没有需要更新的内容');

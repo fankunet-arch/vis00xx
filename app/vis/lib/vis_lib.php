@@ -238,7 +238,7 @@ function vis_get_signed_url($r2Key, $expiresIn = 300) {
 /**
  * 获取视频列表
  * @param PDO $pdo
- * @param array $filters ['category' => '', 'platform' => '', 'status' => 'active']
+ * @param array $filters ['category' => '', 'platform' => '', 'product_id' => '', 'series_id' => '', 'season_id' => '', 'status' => 'active']
  * @param int $limit
  * @param int $offset
  * @return array
@@ -263,6 +263,24 @@ function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
         if (!empty($filters['platform'])) {
             $sql .= " AND platform = :platform";
             $params['platform'] = $filters['platform'];
+        }
+
+        // 产品过滤
+        if (!empty($filters['product_id'])) {
+            $sql .= " AND product_id = :product_id";
+            $params['product_id'] = $filters['product_id'];
+        }
+
+        // 系列过滤
+        if (!empty($filters['series_id'])) {
+            $sql .= " AND series_id = :series_id";
+            $params['series_id'] = $filters['series_id'];
+        }
+
+        // 季节过滤
+        if (!empty($filters['season_id'])) {
+            $sql .= " AND season_id = :season_id";
+            $params['season_id'] = $filters['season_id'];
         }
 
         // 搜索关键词
@@ -313,6 +331,21 @@ function vis_get_videos_count($pdo, $filters = []) {
             $params['platform'] = $filters['platform'];
         }
 
+        if (!empty($filters['product_id'])) {
+            $sql .= " AND product_id = :product_id";
+            $params['product_id'] = $filters['product_id'];
+        }
+
+        if (!empty($filters['series_id'])) {
+            $sql .= " AND series_id = :series_id";
+            $params['series_id'] = $filters['series_id'];
+        }
+
+        if (!empty($filters['season_id'])) {
+            $sql .= " AND season_id = :season_id";
+            $params['season_id'] = $filters['season_id'];
+        }
+
         if (!empty($filters['keyword'])) {
             $sql .= " AND title LIKE :keyword";
             $params['keyword'] = '%' . $filters['keyword'] . '%';
@@ -357,17 +390,22 @@ function vis_create_video($pdo, $data) {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO vis_videos
-            (title, platform, category, r2_key, cover_url, duration,
-             file_size, mime_type, original_filename, created_by, status)
+            (title, platform, category, product_id, series_id, season_id,
+             r2_key, cover_url, duration, file_size, mime_type,
+             original_filename, created_by, status)
             VALUES
-            (:title, :platform, :category, :r2_key, :cover_url, :duration,
-             :file_size, :mime_type, :original_filename, :created_by, 'active')
+            (:title, :platform, :category, :product_id, :series_id, :season_id,
+             :r2_key, :cover_url, :duration, :file_size, :mime_type,
+             :original_filename, :created_by, 'active')
         ");
 
         $stmt->execute([
             'title' => $data['title'],
             'platform' => $data['platform'] ?? 'other',
-            'category' => $data['category'] ?? '其他',
+            'category' => $data['category'] ?? 'product',
+            'product_id' => $data['product_id'] ?? null,
+            'series_id' => $data['series_id'] ?? null,
+            'season_id' => $data['season_id'] ?? null,
             'r2_key' => $data['r2_key'],
             'cover_url' => $data['cover_url'] ?? null,
             'duration' => $data['duration'] ?? 0,
@@ -421,6 +459,21 @@ function vis_update_video($pdo, $id, $data) {
         if (isset($data['platform'])) {
             $fields[] = 'platform = :platform';
             $params['platform'] = $data['platform'];
+        }
+
+        if (isset($data['product_id'])) {
+            $fields[] = 'product_id = :product_id';
+            $params['product_id'] = $data['product_id'];
+        }
+
+        if (isset($data['series_id'])) {
+            $fields[] = 'series_id = :series_id';
+            $params['series_id'] = $data['series_id'];
+        }
+
+        if (isset($data['season_id'])) {
+            $fields[] = 'season_id = :season_id';
+            $params['season_id'] = $data['season_id'];
         }
 
         if (empty($fields)) {
@@ -507,6 +560,181 @@ function vis_get_categories($pdo) {
         return [];
     }
 }
+
+// ============================================
+// 系列管理函数
+// ============================================
+
+/**
+ * 获取所有系列
+ * @param PDO $pdo
+ * @return array
+ */
+function vis_get_series($pdo) {
+    try {
+        $stmt = $pdo->query("
+            SELECT * FROM vis_series
+            WHERE is_enabled = 1
+            ORDER BY sort_order ASC, id ASC
+        ");
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        vis_log('获取系列列表失败: ' . $e->getMessage(), 'ERROR');
+        return [];
+    }
+}
+
+/**
+ * 创建系列
+ * @param PDO $pdo
+ * @param array $data
+ * @return array ['success' => bool, 'id' => int|null, 'message' => string]
+ */
+function vis_create_series($pdo, $data) {
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO vis_series (series_name, series_code, description, sort_order)
+            VALUES (:series_name, :series_code, :description, :sort_order)
+        ");
+
+        $stmt->execute([
+            'series_name' => $data['series_name'],
+            'series_code' => $data['series_code'] ?? strtolower(preg_replace('/\s+/', '_', $data['series_name'])),
+            'description' => $data['description'] ?? null,
+            'sort_order' => $data['sort_order'] ?? 0
+        ]);
+
+        $seriesId = $pdo->lastInsertId();
+        vis_log("系列创建成功: ID={$seriesId}, name={$data['series_name']}", 'INFO');
+
+        return ['success' => true, 'id' => $seriesId, 'message' => '系列创建成功'];
+    } catch (PDOException $e) {
+        vis_log('创建系列失败: ' . $e->getMessage(), 'ERROR');
+        return ['success' => false, 'id' => null, 'message' => '创建失败: ' . $e->getMessage()];
+    }
+}
+
+// ============================================
+// 产品管理函数
+// ============================================
+
+/**
+ * 获取所有产品
+ * @param PDO $pdo
+ * @param int|null $seriesId 可选，按系列筛选
+ * @return array
+ */
+function vis_get_products($pdo, $seriesId = null) {
+    try {
+        $sql = "
+            SELECT p.*, s.series_name
+            FROM vis_products p
+            LEFT JOIN vis_series s ON p.series_id = s.id
+            WHERE p.is_enabled = 1
+        ";
+
+        if ($seriesId !== null) {
+            $sql .= " AND p.series_id = :series_id";
+        }
+
+        $sql .= " ORDER BY p.sort_order ASC, p.id ASC";
+
+        $stmt = $pdo->prepare($sql);
+        if ($seriesId !== null) {
+            $stmt->bindValue(':series_id', $seriesId, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        vis_log('获取产品列表失败: ' . $e->getMessage(), 'ERROR');
+        return [];
+    }
+}
+
+/**
+ * 根据产品名称搜索（支持快速创建）
+ * @param PDO $pdo
+ * @param string $keyword
+ * @return array
+ */
+function vis_search_products($pdo, $keyword) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT p.*, s.series_name
+            FROM vis_products p
+            LEFT JOIN vis_series s ON p.series_id = s.id
+            WHERE p.is_enabled = 1
+            AND p.product_name LIKE :keyword
+            ORDER BY p.product_name ASC
+            LIMIT 20
+        ");
+
+        $stmt->execute(['keyword' => '%' . $keyword . '%']);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        vis_log('搜索产品失败: ' . $e->getMessage(), 'ERROR');
+        return [];
+    }
+}
+
+/**
+ * 创建产品
+ * @param PDO $pdo
+ * @param array $data
+ * @return array ['success' => bool, 'id' => int|null, 'message' => string]
+ */
+function vis_create_product($pdo, $data) {
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO vis_products (product_name, product_code, series_id, description, sort_order)
+            VALUES (:product_name, :product_code, :series_id, :description, :sort_order)
+        ");
+
+        $stmt->execute([
+            'product_name' => $data['product_name'],
+            'product_code' => $data['product_code'] ?? strtolower(preg_replace('/\s+/', '_', $data['product_name'])),
+            'series_id' => $data['series_id'] ?? null,
+            'description' => $data['description'] ?? null,
+            'sort_order' => $data['sort_order'] ?? 0
+        ]);
+
+        $productId = $pdo->lastInsertId();
+        vis_log("产品创建成功: ID={$productId}, name={$data['product_name']}", 'INFO');
+
+        return ['success' => true, 'id' => $productId, 'message' => '产品创建成功'];
+    } catch (PDOException $e) {
+        vis_log('创建产品失败: ' . $e->getMessage(), 'ERROR');
+        return ['success' => false, 'id' => null, 'message' => '创建失败: ' . $e->getMessage()];
+    }
+}
+
+// ============================================
+// 季节管理函数
+// ============================================
+
+/**
+ * 获取所有季节
+ * @param PDO $pdo
+ * @return array
+ */
+function vis_get_seasons($pdo) {
+    try {
+        $stmt = $pdo->query("
+            SELECT * FROM vis_seasons
+            WHERE is_enabled = 1
+            ORDER BY sort_order ASC, id ASC
+        ");
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        vis_log('获取季节列表失败: ' . $e->getMessage(), 'ERROR');
+        return [];
+    }
+}
+
+// ============================================
+// 辅助函数
+// ============================================
 
 /**
  * 验证文件类型

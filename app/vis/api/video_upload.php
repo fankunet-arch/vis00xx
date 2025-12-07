@@ -36,11 +36,16 @@ try {
 
     // 获取表单数据
     $title = trim($_POST['title'] ?? '');
-    $category = trim($_POST['category'] ?? '其他');
+    $category = trim($_POST['category'] ?? 'product');
     $platform = trim($_POST['platform'] ?? 'other');
     $duration = isset($_POST['duration']) ? (int)$_POST['duration'] : 0;  // 前端传来的时长（秒）
     $coverBase64 = trim($_POST['cover_base64'] ?? '');  // 前端传来的封面图（Base64）
     $createdBy = $_SESSION['user_login'] ?? 'system';
+
+    // 新增：产品、系列、季节
+    $productId = !empty($_POST['product_id']) ? (int)$_POST['product_id'] : null;
+    $seriesId = !empty($_POST['series_id']) ? (int)$_POST['series_id'] : null;
+    $seasonId = !empty($_POST['season_id']) ? (int)$_POST['season_id'] : null;
 
     // 验证标题
     if (empty($title)) {
@@ -118,6 +123,9 @@ try {
         'title' => $title,
         'platform' => $platform,
         'category' => $category,
+        'product_id' => $productId,
+        'series_id' => $seriesId,
+        'season_id' => $seasonId,
         'r2_key' => $r2Key,
         'cover_url' => $coverUrl,
         'duration' => $duration,

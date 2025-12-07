@@ -10,8 +10,14 @@ if (!defined('VIS_ENTRY')) {
     die('Access denied');
 }
 
-// 获取分类列表
+// 获取内容类型列表
 $categories = vis_get_categories($pdo);
+// 获取系列列表
+$series = vis_get_series($pdo);
+// 获取季节列表
+$seasons = vis_get_seasons($pdo);
+// 获取产品列表
+$products = vis_get_products($pdo);
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -57,10 +63,22 @@ $categories = vis_get_categories($pdo);
             </div>
         </aside>
 
+        <!-- 移动端遮罩层 -->
+        <div class="mobile-overlay" id="mobileOverlay"></div>
+
         <!-- 主区域 -->
         <main class="main-wrapper">
             <!-- 顶部栏 -->
             <header class="admin-header">
+                <!-- 汉堡菜单按钮（仅移动端显示） -->
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+
                 <div class="page-title">上传视频</div>
 
                 <div class="admin-user">
@@ -97,12 +115,81 @@ $categories = vis_get_categories($pdo);
                             <input type="text" name="title" id="title" class="form-control" required placeholder="请输入视频标题">
                         </div>
 
+                        <!-- 产品信息（核心） -->
                         <div class="form-group">
-                            <label class="form-label">分类 *</label>
+                            <label class="form-label">产品名称</label>
+                            <div style="position: relative;">
+                                <input type="text" name="product_name" id="productName" class="form-control"
+                                       placeholder="输入产品名称（如：珍珠抹茶）或从下拉选择"
+                                       list="productList" autocomplete="off">
+                                <datalist id="productList">
+                                    <?php foreach ($products as $prod): ?>
+                                        <option value="<?php echo htmlspecialchars($prod['product_name']); ?>"
+                                                data-id="<?php echo $prod['id']; ?>"
+                                                data-series-id="<?php echo $prod['series_id'] ?? ''; ?>"
+                                                data-series-name="<?php echo htmlspecialchars($prod['series_name'] ?? ''); ?>">
+                                            <?php if (!empty($prod['series_name'])): ?>
+                                                <?php echo htmlspecialchars($prod['product_name'] . ' (' . $prod['series_name'] . ')'); ?>
+                                            <?php else: ?>
+                                                <?php echo htmlspecialchars($prod['product_name']); ?>
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </datalist>
+                                <input type="hidden" name="product_id" id="productId">
+                                <input type="hidden" name="series_id" id="seriesIdHidden">
+                            </div>
+                            <small style="color: #666; font-size: 12px;">💡 输入新产品名称自动创建，或从列表选择（显示系列）</small>
+                        </div>
+
+                        <!-- 系列输入（仅在创建新产品时显示） -->
+                        <div class="form-group" id="seriesInputGroup" style="display: none;">
+                            <label class="form-label">所属系列 *</label>
+                            <div style="position: relative;">
+                                <input type="text" name="series_name" id="seriesName" class="form-control"
+                                       placeholder="输入系列名称（如：抹茶系列）或从下拉选择"
+                                       list="seriesList" autocomplete="off">
+                                <datalist id="seriesList">
+                                    <?php foreach ($series as $s): ?>
+                                        <option value="<?php echo htmlspecialchars($s['series_name']); ?>"
+                                                data-id="<?php echo $s['id']; ?>">
+                                        </option>
+                                    <?php endforeach; ?>
+                                </datalist>
+                                <input type="hidden" name="series_id_for_new_product" id="seriesIdForNewProduct">
+                            </div>
+                            <small style="color: #666; font-size: 12px;">💡 输入新系列名称自动创建，或从列表选择已有系列</small>
+                        </div>
+
+                        <!-- 显示已选产品的系列信息 -->
+                        <div class="form-group" id="seriesDisplayGroup" style="display: none;">
+                            <label class="form-label">所属系列</label>
+                            <div style="padding: 8px 12px; background: #f5f5f5; border-radius: 4px; color: #666;">
+                                📦 <span id="seriesDisplayName">-</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">适用季节</label>
+                            <select name="season_id" id="seasonId" class="form-select">
+                                <option value="">不限季节</option>
+                                <?php foreach ($seasons as $season): ?>
+                                    <option value="<?php echo $season['id']; ?>"
+                                            <?php echo ($season['season_code'] === 'all_seasons') ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($season['season_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small style="color: #666; font-size: 12px;">默认"四季"，可选择其他季节或留空表示不限季节</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">内容类型 *</label>
                             <select name="category" id="category" class="form-select" required>
-                                <option value="">请选择分类</option>
+                                <option value="">请选择类型</option>
                                 <?php foreach ($categories as $cat): ?>
-                                    <option value="<?php echo htmlspecialchars($cat['category_code']); ?>">
+                                    <option value="<?php echo htmlspecialchars($cat['category_code']); ?>"
+                                            <?php echo ($cat['category_code'] === 'product') ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($cat['category_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -269,6 +356,84 @@ $categories = vis_get_categories($pdo);
             uploadArea.style.display = 'block';
         }
 
+        // 产品名称输入框处理
+        const productName = document.getElementById('productName');
+        const productId = document.getElementById('productId');
+        const seriesIdHidden = document.getElementById('seriesIdHidden');
+        const seriesInputGroup = document.getElementById('seriesInputGroup');
+        const seriesDisplayGroup = document.getElementById('seriesDisplayGroup');
+        const seriesDisplayName = document.getElementById('seriesDisplayName');
+        const seriesName = document.getElementById('seriesName');
+        const seriesIdForNewProduct = document.getElementById('seriesIdForNewProduct');
+
+        const productList = <?php echo json_encode(array_map(function($p) {
+            return [
+                'id' => $p['id'],
+                'name' => $p['product_name'],
+                'series_id' => $p['series_id'] ?? null,
+                'series_name' => $p['series_name'] ?? ''
+            ];
+        }, $products)); ?>;
+
+        const seriesList = <?php echo json_encode(array_map(function($s) {
+            return [
+                'id' => $s['id'],
+                'name' => $s['series_name']
+            ];
+        }, $series)); ?>;
+
+        productName.addEventListener('input', function() {
+            const inputValue = this.value.trim();
+
+            // 检查是否匹配已有产品
+            const matchedProduct = productList.find(p => p.name === inputValue);
+
+            if (matchedProduct) {
+                // 选择了已有产品
+                productId.value = matchedProduct.id;
+                seriesIdHidden.value = matchedProduct.series_id || '';
+
+                // 显示系列信息
+                seriesInputGroup.style.display = 'none';
+                if (matchedProduct.series_name) {
+                    seriesDisplayGroup.style.display = 'block';
+                    seriesDisplayName.textContent = matchedProduct.series_name;
+                } else {
+                    seriesDisplayGroup.style.display = 'none';
+                }
+            } else if (inputValue) {
+                // 输入了新产品名称
+                productId.value = '';
+                seriesIdHidden.value = '';
+                seriesDisplayGroup.style.display = 'none';
+                seriesInputGroup.style.display = 'block';
+            } else {
+                // 清空
+                productId.value = '';
+                seriesIdHidden.value = '';
+                seriesInputGroup.style.display = 'none';
+                seriesDisplayGroup.style.display = 'none';
+            }
+        });
+
+        // 系列名称输入框处理
+        seriesName.addEventListener('input', function() {
+            const inputValue = this.value.trim();
+
+            // 检查是否匹配已有系列
+            const matchedSeries = seriesList.find(s => s.name === inputValue);
+
+            if (matchedSeries) {
+                // 选择了已有系列
+                seriesIdForNewProduct.value = matchedSeries.id;
+                seriesIdHidden.value = matchedSeries.id;
+            } else {
+                // 输入了新系列名称，清空ID（上传时会自动创建）
+                seriesIdForNewProduct.value = '';
+                seriesIdHidden.value = '';
+            }
+        });
+
         // 表单提交
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -281,6 +446,10 @@ $categories = vis_get_categories($pdo);
             const title = document.getElementById('title').value.trim();
             const category = document.getElementById('category').value;
             const platform = document.getElementById('platform').value;
+            const productNameValue = productName.value.trim();
+            const productIdValue = productId.value;
+            const seriesIdValue = seriesIdHidden.value;
+            const seasonId = document.getElementById('seasonId').value;
 
             if (!title) {
                 showAlert('请输入视频标题', '提示', 'warning');
@@ -288,8 +457,53 @@ $categories = vis_get_categories($pdo);
             }
 
             if (!category) {
-                showAlert('请选择视频分类', '提示', 'warning');
+                showAlert('请选择内容类型', '提示', 'warning');
                 return;
+            }
+
+            // 如果输入了产品名称但没有匹配到已有产品，则需要先创建产品
+            let finalProductId = productIdValue;
+            let finalSeriesId = seriesIdValue;
+            const seriesNameValue = seriesName ? seriesName.value.trim() : '';
+
+            if (productNameValue && !productIdValue) {
+                // 新产品：必须输入系列
+                if (!seriesNameValue) {
+                    showAlert('创建新产品时必须指定所属系列', '提示', 'warning');
+                    return;
+                }
+
+                // 如果输入了新系列名称（没有匹配到已有系列），先创建系列
+                if (seriesNameValue && !seriesIdValue) {
+                    try {
+                        const createSeriesResult = await createSeries(seriesNameValue);
+                        if (createSeriesResult.success) {
+                            finalSeriesId = createSeriesResult.id;
+                            console.log('新系列已创建:', seriesNameValue, 'ID:', finalSeriesId);
+                        } else {
+                            showAlert('创建系列失败: ' + createSeriesResult.message, '错误', 'error');
+                            return;
+                        }
+                    } catch (error) {
+                        showAlert('创建系列时出错: ' + error.message, '错误', 'error');
+                        return;
+                    }
+                }
+
+                // 快速创建新产品
+                try {
+                    const createResult = await createProduct(productNameValue, finalSeriesId);
+                    if (createResult.success) {
+                        finalProductId = createResult.id;
+                        console.log('新产品已创建:', productNameValue, 'ID:', finalProductId, 'Series ID:', finalSeriesId);
+                    } else {
+                        showAlert('创建产品失败: ' + createResult.message, '错误', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    showAlert('创建产品时出错: ' + error.message, '错误', 'error');
+                    return;
+                }
             }
 
             const formData = new FormData();
@@ -297,6 +511,21 @@ $categories = vis_get_categories($pdo);
             formData.append('title', title);
             formData.append('category', category);
             formData.append('platform', platform);
+
+            // 季节是可选的（允许空值）
+            if (seasonId) {
+                formData.append('season_id', seasonId);
+            }
+
+            // 产品ID（可选）
+            if (finalProductId) {
+                formData.append('product_id', finalProductId);
+            }
+
+            // 系列ID（从产品自动获取或新建时指定，可选）
+            if (finalSeriesId) {
+                formData.append('series_id', finalSeriesId);
+            }
 
             // 添加视频元数据（时长和封面图）
             if (videoDuration > 0) {
@@ -363,6 +592,47 @@ $categories = vis_get_categories($pdo);
             submitBtn.disabled = false;
             submitBtn.textContent = '上传视频';
         }
+
+        /**
+         * 快速创建系列
+         * @param {string} seriesName - 系列名称
+         * @returns {Promise<{success: boolean, id: number|null, message: string}>}
+         */
+        async function createSeries(seriesName) {
+            const formData = new FormData();
+            formData.append('action', 'create');
+            formData.append('series_name', seriesName);
+
+            const response = await fetch('/vis/ap/index.php?action=series_quick_create', {
+                method: 'POST',
+                body: formData
+            });
+
+            return await response.json();
+        }
+
+        /**
+         * 快速创建产品
+         * @param {string} productName - 产品名称
+         * @param {string} seriesId - 系列ID（可选）
+         * @returns {Promise<{success: boolean, id: number|null, message: string}>}
+         */
+        async function createProduct(productName, seriesId) {
+            const formData = new FormData();
+            formData.append('action', 'create');
+            formData.append('product_name', productName);
+            if (seriesId) {
+                formData.append('series_id', seriesId);
+            }
+
+            const response = await fetch('/vis/ap/index.php?action=product_quick_create', {
+                method: 'POST',
+                body: formData
+            });
+
+            return await response.json();
+        }
     </script>
+    <script src="/vis/ap/js/mobile-menu.js"></script>
 </body>
 </html>

@@ -97,6 +97,25 @@
     background: var(--primary-hover);
 }
 
+/* 第二行筛选（辅助筛选，样式稍微淡化） */
+.filter-row-secondary {
+    opacity: 0.9;
+}
+
+.filter-row-secondary .filter-group {
+    min-width: 150px;
+}
+
+.filter-btn-reset {
+    background: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
+.filter-btn-reset:hover {
+    background: var(--bg-hover);
+}
+
 /* 视频网格 (Mobile First) */
 .video-grid {
     display: grid;
@@ -439,4 +458,263 @@ video::-webkit-media-controls {
     background: var(--primary);
     color: #fff;
     border-color: var(--primary);
+}
+
+/* ========================================
+   移动端响应式优化
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* 头部 */
+    .gallery-header {
+        padding: 32px 0 24px;
+    }
+
+    .gallery-title {
+        font-size: 24px;
+    }
+
+    .gallery-subtitle {
+        font-size: 14px;
+    }
+
+    /* 容器 */
+    .container {
+        padding: 0 16px;
+    }
+
+    /* 筛选栏 */
+    .gallery-filters {
+        padding: 16px;
+        border-radius: var(--radius-md);
+    }
+
+    .filter-row {
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .filter-row.filter-row-secondary {
+        margin-bottom: 0;
+    }
+
+    .filter-group {
+        width: 100%;
+    }
+
+    .filter-label {
+        font-size: 12px;
+        margin-bottom: 6px;
+    }
+
+    .filter-select {
+        font-size: 16px !important; /* 防止iOS自动缩放 */
+        padding: 10px 12px;
+        min-height: 44px; /* 触摸友好 */
+    }
+
+    .filter-btn {
+        width: 100%;
+        min-height: 44px;
+        font-size: 15px;
+        padding: 12px;
+        touch-action: manipulation; /* 优化触摸响应 */
+    }
+
+    .filter-btn-reset {
+        margin-top: 10px;
+    }
+
+    /* 视频网格 */
+    .video-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    /* 视频卡片 */
+    .video-card {
+        border-radius: var(--radius-md);
+    }
+
+    .video-title {
+        font-size: 13px;
+        line-height: 1.4;
+        margin-bottom: 6px;
+        /* 最多显示2行 */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        white-space: normal;
+    }
+
+    .video-meta {
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 10px;
+    }
+
+    .video-badge {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+
+    .video-date {
+        font-size: 10px;
+    }
+
+    .video-duration {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+
+    .video-play-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .video-play-icon::before {
+        border-width: 6px 0 6px 10px;
+    }
+
+    /* 空状态 */
+    .empty-gallery {
+        padding: 60px 20px;
+    }
+
+    .empty-icon {
+        font-size: 48px;
+    }
+
+    .empty-text {
+        font-size: 16px;
+    }
+
+    .empty-subtext {
+        font-size: 13px;
+    }
+
+    /* 分页 */
+    .pagination {
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 20px 0;
+    }
+
+    .pagination-btn {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+    /* 后台入口按钮 */
+    .btn {
+        min-height: 44px;
+        padding: 12px 20px;
+        font-size: 15px;
+    }
+}
+
+/* 小屏手机优化 (< 480px) */
+@media (max-width: 480px) {
+    /* 头部 */
+    .gallery-header {
+        padding: 24px 0 20px;
+    }
+
+    .gallery-title {
+        font-size: 20px;
+    }
+
+    .gallery-subtitle {
+        font-size: 13px;
+    }
+
+    /* 容器 */
+    .container {
+        padding: 0 12px;
+    }
+
+    /* 筛选栏 */
+    .gallery-filters {
+        padding: 12px;
+    }
+
+    .filter-row {
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .filter-label {
+        font-size: 11px;
+    }
+
+    /* 视频网格 - 单列布局 */
+    .video-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* 视频卡片优化 */
+    .video-card {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .video-thumbnail {
+        flex-shrink: 0;
+        width: 120px;
+        padding-top: 0;
+        height: 160px; /* 固定高度 */
+    }
+
+    .video-info {
+        flex: 1;
+        min-width: 0; /* 允许内容缩小 */
+    }
+
+    .video-title {
+        font-size: 14px;
+        margin-bottom: 8px;
+        -webkit-line-clamp: 3; /* 最多3行 */
+    }
+
+    .video-meta {
+        font-size: 11px;
+    }
+
+    /* 分页 */
+    .pagination-btn {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}
+
+/* 超小屏 (< 360px) */
+@media (max-width: 360px) {
+    .container {
+        padding: 0 10px;
+    }
+
+    .video-thumbnail {
+        width: 100px;
+        height: 133px;
+    }
+
+    .video-title {
+        font-size: 13px;
+    }
+
+    .filter-label {
+        display: none; /* 隐藏标签，节省空间 */
+    }
+
+    .filter-group {
+        margin-bottom: 0;
+    }
 }

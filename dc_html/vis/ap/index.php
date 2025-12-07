@@ -30,6 +30,8 @@ $allowed_actions = [
     'video_delete',         // 删除视频
     'admin_categories',     // 分类管理（预留）
     'category_save',        // 保存分类（预留）
+    'product_quick_create', // 产品快速创建/搜索
+    'series_quick_create',  // 系列快速创建/搜索
 ];
 
 // 无需登录的action列表
@@ -61,12 +63,14 @@ if (!in_array($action, $allowed_actions)) {
 
 // API action（执行操作后重定向，不返回JSON）
 $api_actions = [
-    'do_login',         // 登录处理
-    'logout',           // 登出处理
-    'video_upload',     // 上传视频
-    'video_save',       // 保存编辑
-    'video_delete',     // 删除视频
-    'category_save',    // 保存分类
+    'do_login',             // 登录处理
+    'logout',               // 登出处理
+    'video_upload',         // 上传视频
+    'video_save',           // 保存编辑
+    'video_delete',         // 删除视频
+    'category_save',        // 保存分类
+    'product_quick_create', // 产品快速创建/搜索
+    'series_quick_create',  // 系列快速创建/搜索
 ];
 
 // 路由到对应的action或API文件 (在app目录中)
