@@ -245,51 +245,67 @@ function vis_get_signed_url($r2Key, $expiresIn = 300) {
  */
 function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
     try {
-        $sql = "SELECT * FROM vis_videos WHERE 1=1";
+        // 使用 GROUP_CONCAT 聚合系列信息
+        $sql = "
+            SELECT v.*,
+                   GROUP_CONCAT(vs.series_name) as series_tags
+            FROM vis_videos v
+            LEFT JOIN vis_video_series_rel vs ON v.id = vs.video_id
+            WHERE 1=1
+        ";
         $params = [];
 
         // 状态过滤（默认只显示active）
         $status = $filters['status'] ?? 'active';
-        $sql .= " AND status = :status";
+        $sql .= " AND v.status = :status";
         $params['status'] = $status;
 
         // 分类过滤
         if (!empty($filters['category'])) {
-            $sql .= " AND category = :category";
+            $sql .= " AND v.category = :category";
             $params['category'] = $filters['category'];
         }
 
         // 平台过滤
         if (!empty($filters['platform'])) {
-            $sql .= " AND platform = :platform";
+            $sql .= " AND v.platform = :platform";
             $params['platform'] = $filters['platform'];
         }
 
         // 产品过滤
         if (!empty($filters['product_id'])) {
-            $sql .= " AND product_id = :product_id";
+            $sql .= " AND v.product_id = :product_id";
             $params['product_id'] = $filters['product_id'];
         }
 
-        // 系列过滤
+        // 系列过滤 (通过关联表)
+        if (!empty($filters['series'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM vis_video_series_rel sub_vs
+                WHERE sub_vs.video_id = v.id
+                AND sub_vs.series_name = :series
+            )";
+            $params['series'] = $filters['series'];
+        }
+        // 兼容旧系列ID过滤
         if (!empty($filters['series_id'])) {
-            $sql .= " AND series_id = :series_id";
+            $sql .= " AND v.series_id = :series_id";
             $params['series_id'] = $filters['series_id'];
         }
 
         // 季节过滤
         if (!empty($filters['season_id'])) {
-            $sql .= " AND season_id = :season_id";
+            $sql .= " AND v.season_id = :season_id";
             $params['season_id'] = $filters['season_id'];
         }
 
         // 搜索关键词
         if (!empty($filters['keyword'])) {
-            $sql .= " AND title LIKE :keyword";
+            $sql .= " AND v.title LIKE :keyword";
             $params['keyword'] = '%' . $filters['keyword'] . '%';
         }
 
-        $sql .= " ORDER BY created_at DESC LIMIT :limit OFFSET :offset";
+        $sql .= " GROUP BY v.id ORDER BY v.created_at DESC LIMIT :limit OFFSET :offset";
 
         $stmt = $pdo->prepare($sql);
         foreach ($params as $key => $value) {
@@ -314,40 +330,49 @@ function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
  */
 function vis_get_videos_count($pdo, $filters = []) {
     try {
-        $sql = "SELECT COUNT(*) as total FROM vis_videos WHERE 1=1";
+        $sql = "SELECT COUNT(DISTINCT v.id) as total FROM vis_videos v WHERE 1=1";
         $params = [];
 
         $status = $filters['status'] ?? 'active';
-        $sql .= " AND status = :status";
+        $sql .= " AND v.status = :status";
         $params['status'] = $status;
 
         if (!empty($filters['category'])) {
-            $sql .= " AND category = :category";
+            $sql .= " AND v.category = :category";
             $params['category'] = $filters['category'];
         }
 
+        if (!empty($filters['series'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM vis_video_series_rel sub_vs
+                WHERE sub_vs.video_id = v.id
+                AND sub_vs.series_name = :series
+            )";
+            $params['series'] = $filters['series'];
+        }
+
         if (!empty($filters['platform'])) {
-            $sql .= " AND platform = :platform";
+            $sql .= " AND v.platform = :platform";
             $params['platform'] = $filters['platform'];
         }
 
         if (!empty($filters['product_id'])) {
-            $sql .= " AND product_id = :product_id";
+            $sql .= " AND v.product_id = :product_id";
             $params['product_id'] = $filters['product_id'];
         }
 
         if (!empty($filters['series_id'])) {
-            $sql .= " AND series_id = :series_id";
+            $sql .= " AND v.series_id = :series_id";
             $params['series_id'] = $filters['series_id'];
         }
 
         if (!empty($filters['season_id'])) {
-            $sql .= " AND season_id = :season_id";
+            $sql .= " AND v.season_id = :season_id";
             $params['season_id'] = $filters['season_id'];
         }
 
         if (!empty($filters['keyword'])) {
-            $sql .= " AND title LIKE :keyword";
+            $sql .= " AND v.title LIKE :keyword";
             $params['keyword'] = '%' . $filters['keyword'] . '%';
         }
 
@@ -370,7 +395,16 @@ function vis_get_videos_count($pdo, $filters = []) {
  */
 function vis_get_video_by_id($pdo, $id) {
     try {
-        $stmt = $pdo->prepare("SELECT * FROM vis_videos WHERE id = :id LIMIT 1");
+        // 使用 GROUP_CONCAT 聚合系列信息
+        $stmt = $pdo->prepare("
+            SELECT v.*,
+                   GROUP_CONCAT(vs.series_name) as series_tags
+            FROM vis_videos v
+            LEFT JOIN vis_video_series_rel vs ON v.id = vs.video_id
+            WHERE v.id = :id
+            GROUP BY v.id
+            LIMIT 1
+        ");
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetch();
@@ -416,6 +450,27 @@ function vis_create_video($pdo, $data) {
         ]);
 
         $videoId = $pdo->lastInsertId();
+
+        // 2. 插入系列关联 (支持多系列标签)
+        if (isset($data['series_names']) && is_array($data['series_names'])) {
+            $dictStmt = $pdo->prepare("INSERT IGNORE INTO vis_series_dict (name) VALUES (?)");
+            $relStmt = $pdo->prepare("INSERT INTO vis_video_series_rel (video_id, series_name) VALUES (?, ?)");
+
+            foreach ($data['series_names'] as $seriesName) {
+                $seriesName = trim($seriesName);
+                if (empty($seriesName)) continue;
+
+                // 确保系列在字典中存在
+                $dictStmt->execute([$seriesName]);
+
+                // 建立关联
+                try {
+                    $relStmt->execute([$videoId, $seriesName]);
+                } catch (PDOException $e) {
+                    // 忽略重复
+                }
+            }
+        }
 
         vis_log("视频创建成功: ID={$videoId}, title={$data['title']}", 'INFO');
 
@@ -476,13 +531,33 @@ function vis_update_video($pdo, $id, $data) {
             $params['season_id'] = $data['season_id'];
         }
 
-        if (empty($fields)) {
-            return ['success' => false, 'message' => '没有需要更新的字段'];
+        if (!empty($fields)) {
+            $sql = "UPDATE vis_videos SET " . implode(', ', $fields) . " WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
         }
 
-        $sql = "UPDATE vis_videos SET " . implode(', ', $fields) . " WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        // 2. 如果提供了 series_names 字段，更新关联表
+        if (isset($data['series_names']) && is_array($data['series_names'])) {
+            // A. 删除旧关联
+            $pdo->prepare("DELETE FROM vis_video_series_rel WHERE video_id = ?")->execute([$id]);
+
+            // B. 插入新关联
+            $dictStmt = $pdo->prepare("INSERT IGNORE INTO vis_series_dict (name) VALUES (?)");
+            $relStmt = $pdo->prepare("INSERT INTO vis_video_series_rel (video_id, series_name) VALUES (?, ?)");
+
+            foreach ($data['series_names'] as $seriesName) {
+                $seriesName = trim($seriesName);
+                if (empty($seriesName)) continue;
+
+                $dictStmt->execute([$seriesName]);
+                try {
+                    $relStmt->execute([$id, $seriesName]);
+                } catch (PDOException $e) {
+                    // 忽略重复
+                }
+            }
+        }
 
         vis_log("视频更新成功: ID={$id}", 'INFO');
 
@@ -525,7 +600,7 @@ function vis_delete_video($pdo, $id) {
         // 逻辑：将视频路径后缀（如 .mp4）替换为 .jpg
         // 例如：vis/202312/uuid.mp4 -> vis/202312/uuid.jpg
         $coverKey = preg_replace('/\.[^.]+$/', '.jpg', $video['r2_key']);
-        
+
         // 确保生成的key有效且不等于原key（防止误删非扩展名文件）
         if ($coverKey && $coverKey !== $video['r2_key']) {
              // 尝试删除封面，即使文件不存在（S3协议返回204）也视为成功，不影响主流程
@@ -758,6 +833,33 @@ function vis_validate_file_type($mimeType, $extension) {
     $allowedExts = VIS_ALLOWED_EXTENSIONS;
 
     return in_array($mimeType, $allowedMimes) && in_array(strtolower($extension), $allowedExts);
+}
+
+/**
+ * 搜索系列字典
+ * @param PDO $pdo
+ * @param string $keyword
+ * @param int $limit
+ * @return array
+ */
+function vis_search_series_dict($pdo, $keyword, $limit = 20) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT name
+            FROM vis_series_dict
+            WHERE name LIKE :keyword
+            ORDER BY name ASC
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':keyword', '%' . $keyword . '%');
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        vis_log('搜索系列字典失败: ' . $e->getMessage(), 'ERROR');
+        return [];
+    }
 }
 
 /**

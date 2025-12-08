@@ -37,6 +37,13 @@ try {
     // 获取表单数据
     $title = trim($_POST['title'] ?? '');
     $category = trim($_POST['category'] ?? 'product');
+
+    // 多系列支持 (Tags)
+    $seriesNames = $_POST['series_names'] ?? [];
+    if (!is_array($seriesNames)) {
+        $seriesNames = array_filter(explode(',', $seriesNames));
+    }
+
     $platform = trim($_POST['platform'] ?? 'other');
     $duration = isset($_POST['duration']) ? (int)$_POST['duration'] : 0;  // 前端传来的时长（秒）
     $coverBase64 = trim($_POST['cover_base64'] ?? '');  // 前端传来的封面图（Base64）
@@ -175,6 +182,7 @@ try {
             'title' => $title,
             'platform' => $platform,
             'category' => $category,
+            'series_names' => $seriesNames, // 传递系列标签数组
             'product_id' => $productId,
             'series_id' => $seriesId,
             'season_id' => $seasonId,

@@ -179,6 +179,19 @@ foreach ($seasons as $season) {
                                         <?php echo htmlspecialchars($video['category']); ?>
                                     </div>
 
+                                    <!-- 系列标签 -->
+                                    <?php if (!empty($video['series_tags'])): ?>
+                                        <div class="badge-container" style="margin-top: 4px;">
+                                            <?php
+                                            $tags = explode(',', $video['series_tags']);
+                                            foreach (array_slice($tags, 0, 3) as $tag) {
+                                                echo '<span class="badge-season" style="background:#e0f7fa;color:#006064">' . htmlspecialchars($tag) . '</span> ';
+                                            }
+                                            if (count($tags) > 3) echo '...';
+                                            ?>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <!-- 平台标签 -->
                                     <div class="badge-platform platform-<?php echo $video['platform']; ?>">
                                         <?php
@@ -285,6 +298,105 @@ foreach ($seasons as $season) {
 
     <script src="/vis/ap/js/modal.js"></script>
     <script>
+        // -----------------------------------------------------------------
+        // Edit Mode: Tagging Logic
+        // -----------------------------------------------------------------
+        let currentEditTags = [];
+
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        // Render tags into the edit modal
+        function renderEditTags() {
+            const container = document.getElementById('editTagList');
+            if (!container) return;
+
+            container.innerHTML = currentEditTags.map((tag, index) => `
+                <div style="background: #f0f0f1; color: #1d2327; border: 1px solid #c3c4c7; border-radius: 4px; padding: 0 6px; margin: 2px; font-size: 13px; line-height: 22px; display: inline-flex; align-items: center; white-space: nowrap; user-select: none;">
+                    ${tag}
+                    <span onclick="removeEditTag(${index})" style="margin-left: 6px; color: #d63638; cursor: pointer; font-size: 16px; font-weight: bold; line-height: 1;">&times;</span>
+                </div>
+            `).join('');
+        }
+
+        window.removeEditTag = function(index) {
+            currentEditTags.splice(index, 1);
+            renderEditTags();
+        }
+
+        window.addEditTag = function(tagName) {
+            tagName = tagName.trim();
+            if (tagName && !currentEditTags.includes(tagName)) {
+                currentEditTags.push(tagName);
+                renderEditTags();
+                const input = document.getElementById('editSeriesTagInput');
+                if (input) input.value = '';
+            }
+        }
+
+        // Search Handler (Debounced)
+        const handleEditSearch = debounce(async (keyword) => {
+            const list = document.getElementById('editSeriesTagList');
+            if (!list) return;
+
+            if (keyword.length < 1) {
+                list.innerHTML = '';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/vis/ap/index.php?action=search_series&keyword=${encodeURIComponent(keyword)}`);
+                const result = await response.json();
+                if (result.success && result.data && result.data.series) {
+                    list.innerHTML = result.data.series.map(s => `<option value="${s}">`).join('');
+                }
+            } catch (e) {
+                console.error('Series search error:', e);
+            }
+        }, 300);
+
+        // Event Delegation for Edit Modal Inputs
+
+        // Focus wrapper logic for dynamic content
+        document.addEventListener('click', function(e) {
+            if (e.target && (e.target.id === 'editSeriesTagWrapper' || e.target.id === 'editTagList')) {
+                const input = document.getElementById('editSeriesTagInput');
+                if(input) input.focus();
+            }
+        });
+
+        document.addEventListener('input', function(e) {
+            if (e.target && e.target.id === 'editSeriesTagInput') {
+                handleEditSearch(e.target.value.trim());
+            }
+        });
+
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'editSeriesTagInput') {
+                // If selected from datalist or loose focus
+                addEditTag(e.target.value);
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.target && e.target.id === 'editSeriesTagInput') {
+                if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    addEditTag(e.target.value);
+                }
+            }
+        });
+
+
+        // -----------------------------------------------------------------
+        // Core Actions
+        // -----------------------------------------------------------------
+
         // 播放视频
         async function playVideo(id) {
             try {
@@ -296,7 +408,6 @@ foreach ($seasons as $season) {
                     return;
                 }
 
-                // 显示播放器模态框
                 showModal({
                     title: result.data.title,
                     content: `
@@ -315,19 +426,28 @@ foreach ($seasons as $season) {
 
         // 编辑视频
         async function editVideo(id) {
-            // 获取视频信息
             const video = <?php echo json_encode($videos); ?>.find(v => v.id == id);
             if (!video) {
                 showAlert('未找到视频信息', '错误', 'error');
                 return;
             }
 
+            // Initialize tags
+            currentEditTags = video.series_tags ? video.series_tags.split(',').filter(Boolean) : [];
+
             const categories = <?php echo json_encode($categories); ?>;
             const products = <?php echo json_encode($products); ?>;
             const series = <?php echo json_encode($series); ?>;
             const seasons = <?php echo json_encode($seasons); ?>;
 
-            // 创建表单HTML
+            // Pre-render tags HTML
+            const tagsHtml = currentEditTags.map((tag, index) => `
+                <div style="background: #f0f0f1; color: #1d2327; border: 1px solid #c3c4c7; border-radius: 4px; padding: 0 6px; margin: 2px; font-size: 13px; line-height: 22px; display: inline-flex; align-items: center; white-space: nowrap; user-select: none;">
+                    ${tag}
+                    <span onclick="removeEditTag(${index})" style="margin-left: 6px; color: #d63638; cursor: pointer; font-size: 16px; font-weight: bold; line-height: 1;">&times;</span>
+                </div>
+            `).join('');
+
             const formHtml = `
                 <form id="editForm" class="modal-form">
                     <div class="form-group">
@@ -347,8 +467,9 @@ foreach ($seasons as $season) {
                         </select>
                     </div>
 
+                    <!-- Legacy Series ID Select (Optional, but kept for compatibility) -->
                     <div class="form-group">
-                        <label class="form-label">系列</label>
+                        <label class="form-label">主系列 (旧版兼容)</label>
                         <select name="series_id" class="form-select">
                             <option value="">无关联系列</option>
                             ${series.map(s => `
@@ -379,6 +500,19 @@ foreach ($seasons as $season) {
                                 </option>
                             `).join('')}
                         </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">系列标签 <small style="font-weight: normal; color: #666;">(多选)</small></label>
+                        <div class="tag-input-wrapper" id="editSeriesTagWrapper" style="display: flex; flex-wrap: wrap; align-items: center; border: 1px solid #8c8f94; border-radius: 4px; padding: 3px 5px; background-color: #fff; min-height: 36px; cursor: text;">
+                            <div id="editTagList" style="display: contents;">
+                                ${tagsHtml}
+                            </div>
+                            <input type="text" id="editSeriesTagInput" placeholder="输入系列名称..." list="editSeriesTagList"
+                                   autocomplete="off"
+                                   style="border: none !important; outline: none !important; box-shadow: none !important; background: transparent; padding: 2px 4px; margin: 2px; flex: 1 1 80px; min-width: 80px; font-size: 14px; color: #2c3338; height: 26px;">
+                            <datalist id="editSeriesTagList"></datalist>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -418,6 +552,7 @@ foreach ($seasons as $season) {
                         id: id,
                         title: formData.get('title'),
                         category: formData.get('category'),
+                        series_names: currentEditTags, // Use the collected tags
                         platform: formData.get('platform'),
                         product_id: formData.get('product_id') || null,
                         series_id: formData.get('series_id') || null,

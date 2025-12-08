@@ -49,6 +49,11 @@ try {
         $updateData['category'] = trim($input['category']);
     }
 
+    // 多系列支持
+    if (isset($input['series_names']) && is_array($input['series_names'])) {
+        $updateData['series_names'] = $input['series_names'];
+    }
+
     if (isset($input['platform'])) {
         $updateData['platform'] = trim($input['platform']);
     }

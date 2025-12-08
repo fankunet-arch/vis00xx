@@ -218,6 +218,15 @@ $platformNames = [
                                 <div class="video-info">
                                     <h3 class="video-title"><?php echo htmlspecialchars($video['title']); ?></h3>
                                     <div class="video-meta">
+                                        <!-- 系列 -->
+                                        <?php
+                                        if (!empty($video['series_tags'])) {
+                                            $tags = explode(',', $video['series_tags']);
+                                            foreach (array_slice($tags, 0, 2) as $tag) {
+                                                echo '<span class="video-badge" style="background: #e0f7fa; color: #006064;">' . htmlspecialchars($tag) . '</span> ';
+                                            }
+                                        }
+                                        ?>
                                         <?php if (!empty($video['product_id']) && isset($productMap[$video['product_id']])): ?>
                                             <span class="video-badge" style="background: #e8f5e9; color: #2e7d32;">
                                                 🍵 <?php echo htmlspecialchars($productMap[$video['product_id']]); ?>

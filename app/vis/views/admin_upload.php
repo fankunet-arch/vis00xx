@@ -178,6 +178,19 @@ $seasons = vis_get_seasons($pdo);
                             </select>
                         </div>
 
+                        <!-- 系列标签输入 -->
+                        <div class="form-group">
+                            <label class="form-label">系列标签 <small style="font-weight: normal; color: #666;">(可多选，输入新系列回车创建)</small></label>
+                            <div class="tag-input-wrapper" style="border: 1px solid #ddd; padding: 5px; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 5px; min-height: 42px;">
+                                <div id="tagList" style="display: flex; flex-wrap: wrap; gap: 5px;">
+                                    <!-- 动态生成的标签 -->
+                                </div>
+                                <input type="text" id="seriesTagInput" placeholder="输入系列名称..." list="seriesTagList"
+                                       style="border: none; outline: none; flex-grow: 1; min-width: 120px; font-size: 14px; padding: 5px;">
+                                <datalist id="seriesTagList"></datalist>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label class="form-label">来源平台</label>
                             <select name="platform" id="platform" class="form-select">
@@ -406,6 +419,74 @@ $seasons = vis_get_seasons($pdo);
         let seriesSearchResults = [];
 
         // ---------------------------------------------------------
+        // Tagging Logic (Series)
+        // ---------------------------------------------------------
+
+        const seriesTagInput = document.getElementById('seriesTagInput');
+        const seriesTagList = document.getElementById('seriesTagList');
+        const tagListContainer = document.getElementById('tagList');
+        let collectedTags = []; // Store current tags
+
+        // Render tag list
+        function renderTags() {
+            tagListContainer.innerHTML = collectedTags.map((tag, index) => `
+                <div style="background: #e0f7fa; color: #006064; padding: 2px 8px; border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                    ${tag}
+                    <span onclick="removeTag(${index})" style="cursor: pointer; font-weight: bold; color: #00838f;">&times;</span>
+                </div>
+            `).join('');
+        }
+
+        // Add tag
+        function addTag(tagName) {
+            tagName = tagName.trim();
+            if (tagName && !collectedTags.includes(tagName)) {
+                collectedTags.push(tagName);
+                renderTags();
+                seriesTagInput.value = '';
+            }
+        }
+
+        // Remove tag global function
+        window.removeTag = function(index) {
+            collectedTags.splice(index, 1);
+            renderTags();
+        }
+
+        // Input event for autocomplete
+        seriesTagInput.addEventListener('input', debounce(async function() {
+            const keyword = this.value.trim();
+            if (keyword.length < 1) {
+                seriesTagList.innerHTML = '';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/vis/ap/index.php?action=search_series&keyword=${encodeURIComponent(keyword)}`);
+                const result = await response.json();
+                if (result.success && result.data && result.data.series) {
+                    seriesTagList.innerHTML = result.data.series.map(s => `<option value="${s}">`).join('');
+                }
+            } catch (e) {
+                console.error('Series search error:', e);
+            }
+        }, 300));
+
+        // Keydown event for Enter/Comma
+        seriesTagInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                addTag(this.value);
+            }
+        });
+
+        // Handle selection from datalist (change event)
+        seriesTagInput.addEventListener('change', function() {
+            addTag(this.value);
+        });
+
+
+        // ---------------------------------------------------------
         // 1. 模糊搜索逻辑 (Debounce + Ajax)
         // ---------------------------------------------------------
 
@@ -589,6 +670,7 @@ $seasons = vis_get_seasons($pdo);
             }
 
             const title = document.getElementById('title').value.trim();
+
             const category = document.getElementById('category').value;
             const platform = document.getElementById('platform').value;
             const productNameValue = productName.value.trim();
@@ -625,6 +707,12 @@ $seasons = vis_get_seasons($pdo);
             formData.append('video', selectedFile);
             formData.append('title', title);
             formData.append('category', category);
+
+            // Append Series Tags
+            collectedTags.forEach(tag => {
+                formData.append('series_names[]', tag);
+            });
+
             formData.append('platform', platform);
 
             if (seasonId) {
