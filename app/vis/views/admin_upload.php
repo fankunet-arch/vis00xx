@@ -108,13 +108,24 @@ $seasons = vis_get_seasons($pdo);
             transition: background-color 0.15s;
         }
 
-        .series-dropdown-item:hover {
+        .series-dropdown-item:hover,
+        .series-dropdown-item.active {
             background-color: var(--bg-hover);
         }
 
         .series-dropdown-item .highlight {
             color: var(--primary);
             font-weight: 600;
+            background-color: rgba(255, 107, 74, 0.1);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        .series-dropdown-empty {
+            padding: 12px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
         }
     </style>
 </head>
@@ -517,6 +528,7 @@ $seasons = vis_get_seasons($pdo);
         const seriesTagDropdown = document.getElementById('seriesTagDropdown');
         const tagInputWrapper = document.getElementById('tagInputWrapper');
         let collectedTags = []; // Store current tags
+        let currentDropdownIndex = -1; // For keyboard navigation
 
         // Render tag list (inline with input)
         function renderTags() {
@@ -551,9 +563,31 @@ $seasons = vis_get_seasons($pdo);
             renderTags();
         }
 
+        // Highlight matching text
+        function highlightMatch(text, keyword) {
+            if (!keyword) return text;
+            const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<span class="highlight">$1</span>');
+        }
+
+        // Update dropdown active item
+        function updateDropdownActiveItem() {
+            const items = seriesTagDropdown.querySelectorAll('.series-dropdown-item');
+            items.forEach((item, index) => {
+                if (index === currentDropdownIndex) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
         // Input event for autocomplete
         seriesTagInput.addEventListener('input', debounce(async function() {
             const keyword = this.value.trim();
+            currentDropdownIndex = -1; // Reset selection
+
             if (keyword.length < 1) {
                 seriesTagDropdown.innerHTML = '';
                 seriesTagDropdown.classList.remove('active');
@@ -565,12 +599,13 @@ $seasons = vis_get_seasons($pdo);
                 const result = await response.json();
                 if (result.success && result.data && result.data.series && result.data.series.length > 0) {
                     seriesTagDropdown.innerHTML = result.data.series.map(s => {
-                        // Highlight logic if needed
-                        return `<div class="series-dropdown-item" onclick="addTag('${s.replace(/'/g, "\\'")}')">${s}</div>`;
+                        const highlightedText = highlightMatch(s, keyword);
+                        return `<div class="series-dropdown-item" onclick="addTag('${s.replace(/'/g, "\\'")}')">${highlightedText}</div>`;
                     }).join('');
                     seriesTagDropdown.classList.add('active');
                 } else {
-                    seriesTagDropdown.classList.remove('active');
+                    seriesTagDropdown.innerHTML = '<div class="series-dropdown-empty">未找到匹配的系列</div>';
+                    seriesTagDropdown.classList.add('active');
                 }
             } catch (e) {
                 console.error('Series search error:', e);
@@ -578,14 +613,36 @@ $seasons = vis_get_seasons($pdo);
             }
         }, 300));
 
-        // Keydown event for Enter/Comma
+        // Keydown event for Enter/Comma and Arrow Keys
         seriesTagInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.key === ',') {
+            const items = seriesTagDropdown.querySelectorAll('.series-dropdown-item:not(.series-dropdown-empty)');
+            const isDropdownOpen = seriesTagDropdown.classList.contains('active') && items.length > 0;
+
+            if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                // If dropdown is open and has exact match or user just wants to add what they typed
-                // Just add what is in input.
-                // Note: The user can also click a dropdown item which calls addTag directly.
-                addTag(this.value);
+                if (isDropdownOpen) {
+                    currentDropdownIndex = Math.min(currentDropdownIndex + 1, items.length - 1);
+                    updateDropdownActiveItem();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (isDropdownOpen) {
+                    currentDropdownIndex = Math.max(currentDropdownIndex - 1, -1);
+                    updateDropdownActiveItem();
+                }
+            } else if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                if (isDropdownOpen && currentDropdownIndex >= 0 && currentDropdownIndex < items.length) {
+                    // Select the highlighted item
+                    const selectedText = items[currentDropdownIndex].textContent.trim();
+                    addTag(selectedText);
+                } else {
+                    // Add what the user typed
+                    addTag(this.value);
+                }
+            } else if (e.key === 'Escape') {
+                seriesTagDropdown.classList.remove('active');
+                currentDropdownIndex = -1;
             }
         });
 

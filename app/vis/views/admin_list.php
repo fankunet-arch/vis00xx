@@ -432,13 +432,21 @@ foreach ($seasons as $season) {
                 return;
             }
 
-            // Initialize tags
+            // Initialize tags from series_tags (new multi-select)
             currentEditTags = video.series_tags ? video.series_tags.split(',').filter(Boolean) : [];
 
             const categories = <?php echo json_encode($categories); ?>;
             const products = <?php echo json_encode($products); ?>;
             const series = <?php echo json_encode($series); ?>;
             const seasons = <?php echo json_encode($seasons); ?>;
+
+            // 合并旧版主系列到系列标签中（如果存在且未包含）
+            if (video.series_id) {
+                const oldSeries = series.find(s => s.id == video.series_id);
+                if (oldSeries && !currentEditTags.includes(oldSeries.series_name)) {
+                    currentEditTags.unshift(oldSeries.series_name); // 添加到最前面
+                }
+            }
 
             // Pre-render tags HTML
             const tagsHtml = currentEditTags.map((tag, index) => `
@@ -462,19 +470,6 @@ foreach ($seasons as $season) {
                             ${products.map(p => `
                                 <option value="${p.id}" ${video.product_id == p.id ? 'selected' : ''}>
                                     ${p.product_name}${p.series_name ? ' (' + p.series_name + ')' : ''}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </div>
-
-                    <!-- Legacy Series ID Select (Optional, but kept for compatibility) -->
-                    <div class="form-group">
-                        <label class="form-label">主系列 (旧版兼容)</label>
-                        <select name="series_id" class="form-select">
-                            <option value="">无关联系列</option>
-                            ${series.map(s => `
-                                <option value="${s.id}" ${video.series_id == s.id ? 'selected' : ''}>
-                                    ${s.series_name}
                                 </option>
                             `).join('')}
                         </select>
@@ -552,10 +547,9 @@ foreach ($seasons as $season) {
                         id: id,
                         title: formData.get('title'),
                         category: formData.get('category'),
-                        series_names: currentEditTags, // Use the collected tags
+                        series_names: currentEditTags, // Use the collected tags (包含旧版主系列)
                         platform: formData.get('platform'),
                         product_id: formData.get('product_id') || null,
-                        series_id: formData.get('series_id') || null,
                         season_id: formData.get('season_id') || null
                     })
                 });

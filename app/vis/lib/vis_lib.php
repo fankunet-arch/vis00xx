@@ -453,15 +453,21 @@ function vis_create_video($pdo, $data) {
 
         // 2. 插入系列关联 (支持多系列标签)
         if (isset($data['series_names']) && is_array($data['series_names'])) {
-            $dictStmt = $pdo->prepare("INSERT IGNORE INTO vis_series_dict (name) VALUES (?)");
+            $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
+            $createStmt = $pdo->prepare("INSERT IGNORE INTO vis_series (series_name, series_code) VALUES (?, ?)");
             $relStmt = $pdo->prepare("INSERT INTO vis_video_series_rel (video_id, series_name) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
                 $seriesName = trim($seriesName);
                 if (empty($seriesName)) continue;
 
-                // 确保系列在字典中存在
-                $dictStmt->execute([$seriesName]);
+                // 确保系列在 vis_series 表中存在
+                $checkStmt->execute([$seriesName]);
+                if (!$checkStmt->fetch()) {
+                    // 系列不存在，创建新系列
+                    $seriesCode = 'series_' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $seriesName));
+                    $createStmt->execute([$seriesName, $seriesCode]);
+                }
 
                 // 建立关联
                 try {
@@ -543,14 +549,22 @@ function vis_update_video($pdo, $id, $data) {
             $pdo->prepare("DELETE FROM vis_video_series_rel WHERE video_id = ?")->execute([$id]);
 
             // B. 插入新关联
-            $dictStmt = $pdo->prepare("INSERT IGNORE INTO vis_series_dict (name) VALUES (?)");
+            $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
+            $createStmt = $pdo->prepare("INSERT IGNORE INTO vis_series (series_name, series_code) VALUES (?, ?)");
             $relStmt = $pdo->prepare("INSERT INTO vis_video_series_rel (video_id, series_name) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
                 $seriesName = trim($seriesName);
                 if (empty($seriesName)) continue;
 
-                $dictStmt->execute([$seriesName]);
+                // 确保系列在 vis_series 表中存在
+                $checkStmt->execute([$seriesName]);
+                if (!$checkStmt->fetch()) {
+                    // 系列不存在，创建新系列
+                    $seriesCode = 'series_' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $seriesName));
+                    $createStmt->execute([$seriesName, $seriesCode]);
+                }
+
                 try {
                     $relStmt->execute([$id, $seriesName]);
                 } catch (PDOException $e) {
@@ -845,10 +859,11 @@ function vis_validate_file_type($mimeType, $extension) {
 function vis_search_series_dict($pdo, $keyword, $limit = 20) {
     try {
         $stmt = $pdo->prepare("
-            SELECT name
-            FROM vis_series_dict
-            WHERE name LIKE :keyword
-            ORDER BY name ASC
+            SELECT series_name as name
+            FROM vis_series
+            WHERE series_name LIKE :keyword
+              AND is_enabled = 1
+            ORDER BY sort_order ASC, series_name ASC
             LIMIT :limit
         ");
         $stmt->bindValue(':keyword', '%' . $keyword . '%');
@@ -857,7 +872,7 @@ function vis_search_series_dict($pdo, $keyword, $limit = 20) {
 
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     } catch (PDOException $e) {
-        vis_log('搜索系列字典失败: ' . $e->getMessage(), 'ERROR');
+        vis_log('搜索系列失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
