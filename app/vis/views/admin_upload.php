@@ -25,6 +25,98 @@ $seasons = vis_get_seasons($pdo);
     <link rel="stylesheet" href="/vis/ap/css/common.css">
     <link rel="stylesheet" href="/vis/ap/css/admin.css">
     <link rel="stylesheet" href="/vis/ap/css/modal.css">
+    <style>
+        /* Series Tags Custom Styles */
+        .tag-input-wrapper {
+            min-height: 34px;
+            height: auto;
+            padding: 2px 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .tag-input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 1px rgba(255, 107, 74, 0.2);
+        }
+
+        #seriesTagInput {
+            flex-grow: 1;
+            min-width: 120px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--text-main);
+            font-size: 13px;
+            padding: 2px 4px;
+            height: 28px;
+        }
+
+        .tag-item {
+            background-color: var(--bg-hover);
+            color: var(--text-main);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tag-remove {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: bold;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0 2px;
+        }
+
+        .tag-remove:hover {
+            color: var(--text-main);
+        }
+
+        /* Dropdown Menu Styles */
+        .series-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: none;
+            margin-top: 4px;
+        }
+
+        .series-dropdown.active {
+            display: block;
+        }
+
+        .series-dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--text-main);
+            font-size: 13px;
+            transition: background-color 0.15s;
+        }
+
+        .series-dropdown-item:hover {
+            background-color: var(--bg-hover);
+        }
+
+        .series-dropdown-item .highlight {
+            color: var(--primary);
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
     <div class="admin-wrapper">
@@ -181,13 +273,12 @@ $seasons = vis_get_seasons($pdo);
                         <!-- 系列标签输入 -->
                         <div class="form-group">
                             <label class="form-label">系列标签 <small style="font-weight: normal; color: #666;">(可多选，输入新系列回车创建)</small></label>
-                            <div class="tag-input-wrapper" style="border: 1px solid #ddd; padding: 5px; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 5px; min-height: 42px;">
-                                <div id="tagList" style="display: flex; flex-wrap: wrap; gap: 5px;">
-                                    <!-- 动态生成的标签 -->
+                            <div style="position: relative;">
+                                <div class="form-control tag-input-wrapper" id="tagInputWrapper" onclick="document.getElementById('seriesTagInput').focus()">
+                                    <!-- 动态生成的标签和输入框将直接在这里作为兄弟元素 -->
+                                    <input type="text" id="seriesTagInput" placeholder="输入系列名称..." autocomplete="off">
                                 </div>
-                                <input type="text" id="seriesTagInput" placeholder="输入系列名称..." list="seriesTagList"
-                                       style="border: none; outline: none; flex-grow: 1; min-width: 120px; font-size: 14px; padding: 5px;">
-                                <datalist id="seriesTagList"></datalist>
+                                <div id="seriesTagDropdown" class="series-dropdown"></div>
                             </div>
                         </div>
 
@@ -423,18 +514,23 @@ $seasons = vis_get_seasons($pdo);
         // ---------------------------------------------------------
 
         const seriesTagInput = document.getElementById('seriesTagInput');
-        const seriesTagList = document.getElementById('seriesTagList');
-        const tagListContainer = document.getElementById('tagList');
+        const seriesTagDropdown = document.getElementById('seriesTagDropdown');
+        const tagInputWrapper = document.getElementById('tagInputWrapper');
         let collectedTags = []; // Store current tags
 
-        // Render tag list
+        // Render tag list (inline with input)
         function renderTags() {
-            tagListContainer.innerHTML = collectedTags.map((tag, index) => `
-                <div style="background: #e0f7fa; color: #006064; padding: 2px 8px; border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 4px;">
-                    ${tag}
-                    <span onclick="removeTag(${index})" style="cursor: pointer; font-weight: bold; color: #00838f;">&times;</span>
-                </div>
-            `).join('');
+            // Remove existing tags
+            const existingTags = tagInputWrapper.querySelectorAll('.tag-item');
+            existingTags.forEach(tag => tag.remove());
+
+            // Create and insert tags before input
+            collectedTags.forEach((tag, index) => {
+                const tagEl = document.createElement('div');
+                tagEl.className = 'tag-item';
+                tagEl.innerHTML = `${tag} <span class="tag-remove" onclick="removeTag(${index})">&times;</span>`;
+                tagInputWrapper.insertBefore(tagEl, seriesTagInput);
+            });
         }
 
         // Add tag
@@ -444,6 +540,8 @@ $seasons = vis_get_seasons($pdo);
                 collectedTags.push(tagName);
                 renderTags();
                 seriesTagInput.value = '';
+                seriesTagDropdown.classList.remove('active');
+                seriesTagInput.focus();
             }
         }
 
@@ -457,18 +555,26 @@ $seasons = vis_get_seasons($pdo);
         seriesTagInput.addEventListener('input', debounce(async function() {
             const keyword = this.value.trim();
             if (keyword.length < 1) {
-                seriesTagList.innerHTML = '';
+                seriesTagDropdown.innerHTML = '';
+                seriesTagDropdown.classList.remove('active');
                 return;
             }
 
             try {
                 const response = await fetch(`/vis/ap/index.php?action=search_series&keyword=${encodeURIComponent(keyword)}`);
                 const result = await response.json();
-                if (result.success && result.data && result.data.series) {
-                    seriesTagList.innerHTML = result.data.series.map(s => `<option value="${s}">`).join('');
+                if (result.success && result.data && result.data.series && result.data.series.length > 0) {
+                    seriesTagDropdown.innerHTML = result.data.series.map(s => {
+                        // Highlight logic if needed
+                        return `<div class="series-dropdown-item" onclick="addTag('${s.replace(/'/g, "\\'")}')">${s}</div>`;
+                    }).join('');
+                    seriesTagDropdown.classList.add('active');
+                } else {
+                    seriesTagDropdown.classList.remove('active');
                 }
             } catch (e) {
                 console.error('Series search error:', e);
+                seriesTagDropdown.classList.remove('active');
             }
         }, 300));
 
@@ -476,13 +582,18 @@ $seasons = vis_get_seasons($pdo);
         seriesTagInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.key === ',') {
                 e.preventDefault();
+                // If dropdown is open and has exact match or user just wants to add what they typed
+                // Just add what is in input.
+                // Note: The user can also click a dropdown item which calls addTag directly.
                 addTag(this.value);
             }
         });
 
-        // Handle selection from datalist (change event)
-        seriesTagInput.addEventListener('change', function() {
-            addTag(this.value);
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!seriesTagInput.contains(e.target) && !seriesTagDropdown.contains(e.target)) {
+                seriesTagDropdown.classList.remove('active');
+            }
         });
 
 

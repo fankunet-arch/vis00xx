@@ -32,6 +32,7 @@ $allowed_actions = [
     'category_save',        // 保存分类（预留）
     'product_quick_create', // 产品快速创建/搜索
     'series_quick_create',  // 系列快速创建/搜索
+    'search_series',        // 搜索系列标签
     'search_titles',        // 搜索视频标题
 ];
 
@@ -72,6 +73,7 @@ $api_actions = [
     'category_save',        // 保存分类
     'product_quick_create', // 产品快速创建/搜索
     'series_quick_create',  // 系列快速创建/搜索
+    'search_series',        // 搜索系列标签
     'search_titles',        // 搜索视频标题
 ];
 
