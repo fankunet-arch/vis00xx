@@ -2,38 +2,7 @@
 /**
  * Cloudflare R2 Storage Client (S3-Compatible)
  * 文件路径: app/vis/lib/r2_client.php
- * 说明: 轻量级R2存储客户端，实现S3协议的核心功能
- *
- * ============================================
- * 技术参考文档（维护时必读）
- * ============================================
- *
- * 1. AWS Signature Version 4 签名算法（核心）
- *    https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
- *    https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
- *
- * 2. Cloudflare R2 官方文档
- *    https://developers.cloudflare.com/r2/
- *    https://developers.cloudflare.com/r2/api/s3/
- *
- * 3. S3 API 参考
- *    PutObject: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
- *    DeleteObject: https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html
- *    Presigned URLs: https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
- *
- * ============================================
- * 维护注意事项
- * ============================================
- *
- * - R2 完全兼容 AWS S3 API（Signature V4）
- * - 端点格式: https://{accountId}.r2.cloudflarestorage.com
- * - 区域代码固定为 'auto'（R2特有）
- * - 如遇签名错误，请检查：
- *   1. 时间戳格式（必须是 UTC 时间）
- *   2. Canonical Request 构建顺序
- *   3. 字符串编码问题（URL编码）
- *
- * ============================================
+ * 说明: 轻量级R2存储客户端，修复大文件上传内存溢出问题 (流式上传)
  */
 
 class R2Client {
@@ -57,7 +26,7 @@ class R2Client {
     }
 
     /**
-     * 上传文件到R2
+     * 上传文件到R2 (使用流式上传，低内存占用)
      * @param string $key 对象键（路径）
      * @param string $filePath 本地文件路径
      * @param string $contentType MIME类型
@@ -69,32 +38,41 @@ class R2Client {
                 return ['success' => false, 'message' => 'File not found', 'etag' => null];
             }
 
-            $fileContent = file_get_contents($filePath);
-            $contentLength = strlen($fileContent);
-            $contentMD5 = base64_encode(md5($fileContent, true));
+            $fileSize = filesize($filePath);
+            
+            // 使用流式哈希计算，避免将整个文件读入内存
+            $contentMD5 = base64_encode(md5_file($filePath, true));
+            $contentSha256 = hash_file('sha256', $filePath);
 
             $url = "{$this->endpoint}/{$this->bucketName}/{$key}";
             $timestamp = gmdate('Ymd\THis\Z');
-            $date = gmdate('Ymd');
 
             // 构建请求头
             $headers = [
                 'Content-Type' => $contentType,
-                'Content-Length' => $contentLength,
+                'Content-Length' => $fileSize,
                 'Content-MD5' => $contentMD5,
                 'x-amz-date' => $timestamp,
-                'x-amz-content-sha256' => hash('sha256', $fileContent),
+                'x-amz-content-sha256' => $contentSha256,
             ];
 
-            // AWS Signature V4
-            $signature = $this->signRequest('PUT', $key, $headers, $fileContent, $timestamp);
+            // AWS Signature V4 - 传递预计算的Hash
+            $signature = $this->signRequest('PUT', $key, $headers, $contentSha256, $timestamp);
             $headers['Authorization'] = $signature;
+
+            // 打开文件句柄进行流式上传
+            $fp = fopen($filePath, 'r');
+            if (!$fp) {
+                throw new Exception("无法打开文件进行读取: $filePath");
+            }
 
             // 发送请求
             $ch = curl_init($url);
             curl_setopt_array($ch, [
+                CURLOPT_UPLOAD => true,          // 启用上传模式
+                CURLOPT_INFILE => $fp,           // 设定输入文件句柄
+                CURLOPT_INFILESIZE => $fileSize, // 设定文件大小
                 CURLOPT_CUSTOMREQUEST => 'PUT',
-                CURLOPT_POSTFIELDS => $fileContent,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => $this->formatHeaders($headers),
                 CURLOPT_SSL_VERIFYPEER => true,
@@ -103,7 +81,10 @@ class R2Client {
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlError = curl_error($ch);
+            
+            // 关闭资源
             curl_close($ch);
+            fclose($fp);
 
             if ($httpCode >= 200 && $httpCode < 300) {
                 return [
@@ -128,20 +109,21 @@ class R2Client {
 
     /**
      * 删除R2中的对象
-     * @param string $key 对象键
-     * @return array ['success' => bool, 'message' => string]
      */
     public function deleteObject($key) {
         try {
             $url = "{$this->endpoint}/{$this->bucketName}/{$key}";
             $timestamp = gmdate('Ymd\THis\Z');
+            
+            // 空负载的Hash
+            $emptyPayloadHash = hash('sha256', '');
 
             $headers = [
                 'x-amz-date' => $timestamp,
-                'x-amz-content-sha256' => hash('sha256', ''),
+                'x-amz-content-sha256' => $emptyPayloadHash,
             ];
 
-            $signature = $this->signRequest('DELETE', $key, $headers, '', $timestamp);
+            $signature = $this->signRequest('DELETE', $key, $headers, $emptyPayloadHash, $timestamp);
             $headers['Authorization'] = $signature;
 
             $ch = curl_init($url);
@@ -169,10 +151,7 @@ class R2Client {
     }
 
     /**
-     * 生成预签名URL（用于临时访问）
-     * @param string $key 对象键
-     * @param int $expiresIn 有效期（秒）
-     * @return string|null 签名URL
+     * 获取签名URL
      */
     public function getPresignedUrl($key, $expiresIn = 300) {
         try {
@@ -226,8 +205,9 @@ class R2Client {
 
     /**
      * AWS Signature V4 签名
+     * 修改说明: $payloadHash 直接接收Hash值，而不是原始负载
      */
-    private function signRequest($method, $key, &$headers, $payload, $timestamp) {
+    private function signRequest($method, $key, &$headers, $payloadHash, $timestamp) {
         $date = substr($timestamp, 0, 8);
         $scope = "{$date}/{$this->region}/s3/aws4_request";
 
@@ -246,7 +226,7 @@ class R2Client {
             '',
             $canonicalHeaders,
             $signedHeaders,
-            hash('sha256', $payload)
+            $payloadHash // 使用预计算的Hash
         ]);
 
         $stringToSign = implode("\n", [
