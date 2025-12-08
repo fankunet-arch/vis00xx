@@ -83,21 +83,31 @@ $platformNames = [
     <div class="gallery-wrapper">
         <!-- 头部 -->
         <header class="gallery-header">
-            <div class="container">
-                <h1 class="gallery-title">视频灵感库</h1>
-                <p class="gallery-subtitle">探索精选视频内容，激发创意灵感</p>
-            </div>
-        </header>
+            <div class="gallery-title">视频灵感库</div>
+            <p class="gallery-subtitle">探索精选视频内容，激发创意灵感</p>
+            </header>
 
         <!-- 主内容 -->
         <main>
             <div class="container">
                 <!-- 筛选栏 -->
                 <div class="gallery-filters">
-                    <form method="GET" action="/vis/index.php">
+                    <?php
+                        // 检查是否有活跃的筛选条件
+                        $hasActiveFilters = !empty($category) || !empty($platform) || !empty($productId) || !empty($seriesId) || !empty($seasonId);
+                        $filterBtnText = $hasActiveFilters ? '🔵 已启用筛选 (点击修改)' : '🔍 筛选视频 / 查找';
+                    ?>
+
+                    <button type="button" class="filter-toggle-btn <?php echo $hasActiveFilters ? 'has-filters' : ''; ?>" onclick="toggleFilters()">
+                        <?php echo $filterBtnText; ?>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+
+                    <form id="galleryFilterForm" method="GET" action="/vis/index.php">
                         <input type="hidden" name="action" value="gallery">
 
-                        <!-- 第一行：产品、系列、季节（核心筛选） -->
                         <div class="filter-row" style="margin-bottom: 12px;">
                             <div class="filter-group">
                                 <label class="filter-label">📦 系列</label>
@@ -145,7 +155,6 @@ $platformNames = [
                             <button type="submit" class="filter-btn">筛选</button>
                         </div>
 
-                        <!-- 第二行：内容类型、平台（辅助筛选） -->
                         <div class="filter-row filter-row-secondary">
                             <div class="filter-group">
                                 <label class="filter-label">类型</label>
@@ -394,6 +403,21 @@ $platformNames = [
             // 恢复当前选中的产品
             if (currentProductId) {
                 productFilter.value = currentProductId;
+            }
+        }
+
+        // 切换筛选栏显示/隐藏
+        function toggleFilters() {
+            const form = document.getElementById('galleryFilterForm');
+            const btn = document.querySelector('.filter-toggle-btn svg');
+
+            form.classList.toggle('expanded');
+
+            // 旋转箭头图标
+            if (form.classList.contains('expanded')) {
+                btn.style.transform = 'rotate(180deg)';
+            } else {
+                btn.style.transform = 'rotate(0deg)';
             }
         }
     </script>
