@@ -12,12 +12,9 @@ if (!defined('VIS_ENTRY')) {
 
 // 获取内容类型列表
 $categories = vis_get_categories($pdo);
-// 获取系列列表
-$series = vis_get_series($pdo);
 // 获取季节列表
 $seasons = vis_get_seasons($pdo);
-// 获取产品列表
-$products = vis_get_products($pdo);
+// 初始化时不再加载所有产品和系列，改为异步搜索
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -112,7 +109,11 @@ $products = vis_get_products($pdo);
                         <!-- 视频信息 -->
                         <div class="form-group">
                             <label class="form-label">视频标题 *</label>
-                            <input type="text" name="title" id="title" class="form-control" required placeholder="请输入视频标题">
+                            <div style="position: relative;">
+                                <input type="text" name="title" id="title" class="form-control" required
+                                       placeholder="请输入视频标题" autocomplete="off" list="titleList">
+                                <datalist id="titleList"></datalist>
+                            </div>
                         </div>
 
                         <!-- 产品信息（核心） -->
@@ -122,20 +123,7 @@ $products = vis_get_products($pdo);
                                 <input type="text" name="product_name" id="productName" class="form-control"
                                        placeholder="输入产品名称（如：珍珠抹茶）或从下拉选择"
                                        list="productList" autocomplete="off">
-                                <datalist id="productList">
-                                    <?php foreach ($products as $prod): ?>
-                                        <option value="<?php echo htmlspecialchars($prod['product_name']); ?>"
-                                                data-id="<?php echo $prod['id']; ?>"
-                                                data-series-id="<?php echo $prod['series_id'] ?? ''; ?>"
-                                                data-series-name="<?php echo htmlspecialchars($prod['series_name'] ?? ''); ?>">
-                                            <?php if (!empty($prod['series_name'])): ?>
-                                                <?php echo htmlspecialchars($prod['product_name'] . ' (' . $prod['series_name'] . ')'); ?>
-                                            <?php else: ?>
-                                                <?php echo htmlspecialchars($prod['product_name']); ?>
-                                            <?php endif; ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </datalist>
+                                <datalist id="productList"></datalist>
                                 <input type="hidden" name="product_id" id="productId">
                                 <input type="hidden" name="series_id" id="seriesIdHidden">
                             </div>
@@ -149,13 +137,7 @@ $products = vis_get_products($pdo);
                                 <input type="text" name="series_name" id="seriesName" class="form-control"
                                        placeholder="输入系列名称（如：抹茶系列）或从下拉选择"
                                        list="seriesList" autocomplete="off">
-                                <datalist id="seriesList">
-                                    <?php foreach ($series as $s): ?>
-                                        <option value="<?php echo htmlspecialchars($s['series_name']); ?>"
-                                                data-id="<?php echo $s['id']; ?>">
-                                        </option>
-                                    <?php endforeach; ?>
-                                </datalist>
+                                <datalist id="seriesList"></datalist>
                                 <input type="hidden" name="series_id_for_new_product" id="seriesIdForNewProduct">
                             </div>
                             <small style="color: #666; font-size: 12px;">💡 输入新系列名称自动创建，或从列表选择已有系列</small>
@@ -322,13 +304,13 @@ $products = vis_get_products($pdo);
                 if (video.dataset.timeoutId) {
                     clearTimeout(parseInt(video.dataset.timeoutId));
                 }
-                
+
                 // 释放资源
                 if (video.src) {
                     URL.revokeObjectURL(video.src);
                     video.removeAttribute('src');
                 }
-                
+
                 // 恢复按钮状态
                 if (submitBtn.disabled) {
                     submitBtn.disabled = false;
@@ -365,7 +347,7 @@ $products = vis_get_products($pdo);
                                 canvas.height = video.videoHeight;
                                 const ctx = canvas.getContext('2d');
                                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
+
                                 videoCoverBase64 = canvas.toDataURL('image/jpeg', 0.8);
                                 console.log('封面图生成成功');
                             } catch (err) {
@@ -397,7 +379,7 @@ $products = vis_get_products($pdo);
             fileInput.value = '';
             fileSelected.style.display = 'none';
             uploadArea.style.display = 'block';
-            
+
             // [新增] 重置按钮状态
             submitBtn.disabled = false;
             submitBtn.textContent = '上传视频';
@@ -412,74 +394,190 @@ $products = vis_get_products($pdo);
         const seriesDisplayName = document.getElementById('seriesDisplayName');
         const seriesName = document.getElementById('seriesName');
         const seriesIdForNewProduct = document.getElementById('seriesIdForNewProduct');
+        const titleInput = document.getElementById('title');
 
-        const productList = <?php echo json_encode(array_map(function($p) {
-            return [
-                'id' => $p['id'],
-                'name' => $p['product_name'],
-                'series_id' => $p['series_id'] ?? null,
-                'series_name' => $p['series_name'] ?? ''
-            ];
-        }, $products)); ?>;
+        // 数据列表引用
+        const productDataList = document.getElementById('productList');
+        const seriesDataList = document.getElementById('seriesList');
+        const titleDataList = document.getElementById('titleList');
 
-        const seriesList = <?php echo json_encode(array_map(function($s) {
-            return [
-                'id' => $s['id'],
-                'name' => $s['series_name']
-            ];
-        }, $series)); ?>;
+        // 缓存搜索结果，用于ID匹配
+        let productSearchResults = [];
+        let seriesSearchResults = [];
 
-        productName.addEventListener('input', function() {
-            const inputValue = this.value.trim();
+        // ---------------------------------------------------------
+        // 1. 模糊搜索逻辑 (Debounce + Ajax)
+        // ---------------------------------------------------------
 
-            // 检查是否匹配已有产品
-            const matchedProduct = productList.find(p => p.name === inputValue);
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
 
-            if (matchedProduct) {
-                // 选择了已有产品
-                productId.value = matchedProduct.id;
-                seriesIdHidden.value = matchedProduct.series_id || '';
+        // 视频标题搜索
+        titleInput.addEventListener('input', debounce(async function() {
+            const keyword = this.value.trim();
 
-                // 显示系列信息
-                seriesInputGroup.style.display = 'none';
-                if (matchedProduct.series_name) {
-                    seriesDisplayGroup.style.display = 'block';
-                    seriesDisplayName.textContent = matchedProduct.series_name;
-                } else {
-                    seriesDisplayGroup.style.display = 'none';
+            // Sync Logic Trigger: Also check sync whenever input changes
+            handleTitleSync(keyword);
+
+            if (keyword.length < 1) {
+                titleDataList.innerHTML = '';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/vis/ap/index.php?action=search_titles&keyword=${encodeURIComponent(keyword)}`);
+                const result = await response.json();
+
+                if (result.success && result.data && result.data.titles) {
+                    // Distinct checked by backend
+                    titleDataList.innerHTML = result.data.titles.map(t => `<option value="${t}">`).join('');
                 }
-            } else if (inputValue) {
-                // 输入了新产品名称
-                productId.value = '';
-                seriesIdHidden.value = '';
+            } catch (e) {
+                console.error('Search error:', e);
+            }
+        }, 300));
+
+        // 产品搜索
+        productName.addEventListener('input', debounce(async function() {
+            const keyword = this.value.trim();
+
+            // 重置ID，直到匹配
+            productId.value = '';
+            seriesIdHidden.value = '';
+
+            // 如果为空，重置UI
+            if (keyword.length < 1) {
+                productDataList.innerHTML = '';
                 seriesDisplayGroup.style.display = 'none';
-                seriesInputGroup.style.display = 'block';
-            } else {
-                // 清空
-                productId.value = '';
-                seriesIdHidden.value = '';
                 seriesInputGroup.style.display = 'none';
-                seriesDisplayGroup.style.display = 'none';
+                return;
             }
-        });
 
-        // 系列名称输入框处理
-        seriesName.addEventListener('input', function() {
-            const inputValue = this.value.trim();
+            // UI逻辑：假设它是新产品，直到被证明是已存在的
+            seriesInputGroup.style.display = 'block';
+            seriesDisplayGroup.style.display = 'none';
 
-            // 检查是否匹配已有系列
-            const matchedSeries = seriesList.find(s => s.name === inputValue);
+            try {
+                const response = await fetch(`/vis/ap/index.php?action=product_quick_create&action=search&keyword=${encodeURIComponent(keyword)}`);
+                const result = await response.json();
 
-            if (matchedSeries) {
-                // 选择了已有系列
-                seriesIdForNewProduct.value = matchedSeries.id;
-                seriesIdHidden.value = matchedSeries.id;
+                if (result.success && result.data && result.data.products) {
+                    productSearchResults = result.data.products;
+                    productDataList.innerHTML = productSearchResults.map(p => {
+                        const label = p.series_name ? `${p.product_name} (${p.series_name})` : p.product_name;
+                        return `<option value="${p.product_name}">${label}</option>`; // option value 只显示名称
+                    }).join('');
+
+                    // 检查是否完全匹配当前输入
+                    const matched = productSearchResults.find(p => p.product_name === keyword);
+                    if (matched) {
+                         productId.value = matched.id;
+                         seriesIdHidden.value = matched.series_id || '';
+
+                         // 显示已关联系列
+                         if (matched.series_name) {
+                             seriesDisplayGroup.style.display = 'block';
+                             seriesDisplayName.textContent = matched.series_name;
+                             seriesInputGroup.style.display = 'none';
+                         }
+                    }
+                }
+            } catch (e) {
+                console.error('Product Search error:', e);
+            }
+        }, 300));
+
+        // 系列搜索
+        seriesName.addEventListener('input', debounce(async function() {
+            const keyword = this.value.trim();
+
+            seriesIdForNewProduct.value = '';
+            // update shared hidden too if needed, but logic uses `seriesIdForNewProduct` or `seriesIdHidden` depending on context.
+            // Actually, `seriesIdHidden` is for product's series. If product is new, we look at `seriesName`.
+
+            if (keyword.length < 1) {
+                seriesDataList.innerHTML = '';
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'search');
+                formData.append('keyword', keyword);
+
+                const response = await fetch('/vis/ap/index.php?action=series_quick_create', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success && result.data && result.data.series) {
+                    seriesSearchResults = result.data.series;
+                    seriesDataList.innerHTML = seriesSearchResults.map(s =>
+                        `<option value="${s.series_name}">`
+                    ).join('');
+
+                    const matched = seriesSearchResults.find(s => s.series_name === keyword);
+                    if (matched) {
+                         seriesIdForNewProduct.value = matched.id;
+                         seriesIdHidden.value = matched.id; // Also update this just in case
+                    }
+                }
+            } catch (e) {
+                console.error('Series Search error:', e);
+            }
+        }, 300));
+
+        // ---------------------------------------------------------
+        // 2. 智能字段同步逻辑 (Sync Logic)
+        // ---------------------------------------------------------
+
+        let lastSyncedTitle = '';
+
+        // 初始化：如果页面加载时已有值（例如编辑模式，虽此处是上传页），可以设初始值
+        // 这里默认是空
+
+        function handleTitleSync(newTitle) {
+            const currentProduct = productName.value;
+
+            // 核心逻辑:
+            // 如果 Product Name 为空，或者 Product Name 等于我们上次同步进去的值（说明尚未手动脱钩）
+            // 则进行同步。
+
+            // 初始状态：A="", B="" -> last="" -> match.
+            // 输入A="T" -> B="T", last="T".
+            // 修改A="Te" -> match (B is "T" == last "T") -> B="Te", last="Te".
+            // 修改B="Test" -> A="Te", B="Test", last="Te".
+            // 修改A="Tes" -> match? (B is "Test" != last "Tes"?) -> No sync.
+
+            // 注意：input事件触发时，productName.value 是当前值。
+            // 我们需要比较的是 productName.value 是否等于 lastSyncedTitle。
+
+            if (currentProduct === lastSyncedTitle) {
+                productName.value = newTitle;
+                lastSyncedTitle = newTitle;
+
+                // 触发产品名的 input 事件以激活搜索和ID清除逻辑
+                productName.dispatchEvent(new Event('input'));
             } else {
-                // 输入了新系列名称，清空ID（上传时会自动创建）
-                seriesIdForNewProduct.value = '';
-                seriesIdHidden.value = '';
+                // 如果不匹配，说明用户手动改过B，或者B本来就有值。
+                // 此时只更新 lastSyncedTitle 为当前A，不再去碰B。
+                // 等等，如果现在A变化了，lastSyncedTitle 应该更新为A的新值，以便下次比较？
+                // 不，Sync Logic要求: "修改 A 为 XYZ, B 保持 GGG 不变 (因修改前两者不一致)"
+
+                // 但如果我把A改回去了呢？
+                // 场景：A="ABC", B="GGG". last="ABC".
+                // 改A -> "ABCD". B="GGG". last="ABCD".
+
+                lastSyncedTitle = newTitle;
             }
-        });
+        }
+
 
         // 表单提交
         uploadForm.addEventListener('submit', async (e) => {
@@ -495,7 +593,9 @@ $products = vis_get_products($pdo);
             const platform = document.getElementById('platform').value;
             const productNameValue = productName.value.trim();
             const productIdValue = productId.value;
-            const seriesIdValue = seriesIdHidden.value;
+            // seriesIdHidden gets populated if we select existing product
+            // or if we select existing series for new product (via seriesName input logic above)
+            let seriesIdValue = seriesIdHidden.value;
             const seasonId = document.getElementById('seasonId').value;
 
             if (!title) {
@@ -508,48 +608,16 @@ $products = vis_get_products($pdo);
                 return;
             }
 
-            // 如果输入了产品名称但没有匹配到已有产品，则需要先创建产品
-            let finalProductId = productIdValue;
-            let finalSeriesId = seriesIdValue;
+            // 验证新产品的系列
             const seriesNameValue = seriesName ? seriesName.value.trim() : '';
 
+            // 如果是新产品 (有名字无ID)，必须有系列 (有名字或有ID)
             if (productNameValue && !productIdValue) {
-                // 新产品：必须输入系列
-                if (!seriesNameValue) {
-                    showAlert('创建新产品时必须指定所属系列', '提示', 'warning');
-                    return;
-                }
-
-                // 如果输入了新系列名称（没有匹配到已有系列），先创建系列
-                if (seriesNameValue && !seriesIdValue) {
-                    try {
-                        const createSeriesResult = await createSeries(seriesNameValue);
-                        if (createSeriesResult.success) {
-                            finalSeriesId = createSeriesResult.id;
-                            console.log('新系列已创建:', seriesNameValue, 'ID:', finalSeriesId);
-                        } else {
-                            showAlert('创建系列失败: ' + createSeriesResult.message, '错误', 'error');
-                            return;
-                        }
-                    } catch (error) {
-                        showAlert('创建系列时出错: ' + error.message, '错误', 'error');
-                        return;
-                    }
-                }
-
-                // 快速创建新产品
-                try {
-                    const createResult = await createProduct(productNameValue, finalSeriesId);
-                    if (createResult.success) {
-                        finalProductId = createResult.id;
-                        console.log('新产品已创建:', productNameValue, 'ID:', finalProductId, 'Series ID:', finalSeriesId);
-                    } else {
-                        showAlert('创建产品失败: ' + createResult.message, '错误', 'error');
-                        return;
-                    }
-                } catch (error) {
-                    showAlert('创建产品时出错: ' + error.message, '错误', 'error');
-                    return;
+                // 检查系列: seriesIdValue (hidden) 或 seriesNameValue (text)
+                // 注意: seriesName input listener 会更新 seriesIdHidden 如果匹配已有系列
+                if (!seriesIdValue && !seriesNameValue) {
+                     showAlert('创建新产品时必须指定所属系列', '提示', 'warning');
+                     return;
                 }
             }
 
@@ -559,30 +627,38 @@ $products = vis_get_products($pdo);
             formData.append('category', category);
             formData.append('platform', platform);
 
-            // 季节是可选的（允许空值）
             if (seasonId) {
                 formData.append('season_id', seasonId);
             }
 
-            // 产品ID（可选）
-            if (finalProductId) {
-                formData.append('product_id', finalProductId);
+            // 发送产品信息
+            if (productIdValue) {
+                formData.append('product_id', productIdValue);
+            } else if (productNameValue) {
+                formData.append('product_name', productNameValue);
             }
 
-            // 系列ID（从产品自动获取或新建时指定，可选）
-            if (finalSeriesId) {
-                formData.append('series_id', finalSeriesId);
+            // 发送系列信息
+            // 逻辑：
+            // 1. 如果选了现有产品，series_id 可能已经有了 (from product)。
+            // 2. 如果是新产品，可能选了现有系列 (seriesIdValue)，也可能输入新系列 (seriesNameValue)。
+            if (seriesIdValue) {
+                formData.append('series_id', seriesIdValue);
+            }
+            // 即使有ID，如果用户意图是新建/指定名称，也可以传名称，后端会校验
+            // 但如果已经匹配了ID，传ID更稳。
+            // 如果没有ID，传名称。
+            if (!seriesIdValue && seriesNameValue) {
+                formData.append('series_name', seriesNameValue);
             }
 
-            // 添加视频元数据（时长和封面图）
+            // 添加视频元数据
             if (videoDuration > 0) {
                 formData.append('duration', videoDuration);
-                console.log('上传视频时长:', videoDuration, '秒');
             }
 
             if (videoCoverBase64) {
                 formData.append('cover_base64', videoCoverBase64);
-                console.log('上传封面图: Base64 (长度:', videoCoverBase64.length, ')');
             }
 
             // 显示进度条
@@ -593,7 +669,6 @@ $products = vis_get_products($pdo);
             try {
                 const xhr = new XMLHttpRequest();
 
-                // 进度监听
                 xhr.upload.addEventListener('progress', (e) => {
                     if (e.lengthComputable) {
                         const percent = Math.round((e.loaded / e.total) * 100);
@@ -604,13 +679,18 @@ $products = vis_get_products($pdo);
 
                 xhr.addEventListener('load', async () => {
                     if (xhr.status === 200) {
-                        const result = JSON.parse(xhr.responseText);
-                        if (result.success) {
-                            await showAlert('视频上传成功！', '成功', 'success');
-                            window.location.href = '/vis/ap/index.php?action=admin_list';
-                        } else {
-                            showAlert(result.message || '上传失败', '错误', 'error');
-                            resetUploadForm();
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            if (result.success) {
+                                await showAlert('视频上传成功！', '成功', 'success');
+                                window.location.href = '/vis/ap/index.php?action=admin_list';
+                            } else {
+                                showAlert(result.message || '上传失败', '错误', 'error');
+                                resetUploadForm();
+                            }
+                        } catch (e) {
+                             showAlert('服务器返回格式错误', '错误', 'error');
+                             resetUploadForm();
                         }
                     } else {
                         showAlert('上传失败，服务器错误', '错误', 'error');
@@ -640,45 +720,7 @@ $products = vis_get_products($pdo);
             submitBtn.textContent = '上传视频';
         }
 
-        /**
-         * 快速创建系列
-         * @param {string} seriesName - 系列名称
-         * @returns {Promise<{success: boolean, id: number|null, message: string}>}
-         */
-        async function createSeries(seriesName) {
-            const formData = new FormData();
-            formData.append('action', 'create');
-            formData.append('series_name', seriesName);
-
-            const response = await fetch('/vis/ap/index.php?action=series_quick_create', {
-                method: 'POST',
-                body: formData
-            });
-
-            return await response.json();
-        }
-
-        /**
-         * 快速创建产品
-         * @param {string} productName - 产品名称
-         * @param {string} seriesId - 系列ID（可选）
-         * @returns {Promise<{success: boolean, id: number|null, message: string}>}
-         */
-        async function createProduct(productName, seriesId) {
-            const formData = new FormData();
-            formData.append('action', 'create');
-            formData.append('product_name', productName);
-            if (seriesId) {
-                formData.append('series_id', seriesId);
-            }
-
-            const response = await fetch('/vis/ap/index.php?action=product_quick_create', {
-                method: 'POST',
-                body: formData
-            });
-
-            return await response.json();
-        }
+        // Removed quick_create functions as they are now handled by video_upload transaction
     </script>
     <script src="/vis/ap/js/mobile-menu.js"></script>
 </body>
