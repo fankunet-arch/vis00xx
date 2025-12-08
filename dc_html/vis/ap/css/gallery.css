@@ -661,47 +661,51 @@ video::-webkit-media-controls {
         font-size: 11px;
     }
 
-    /* 视频网格 - 单列布局 */
+    /* [修复点1] 视频网格 - 强制双列布局 */
     .video-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px; /* 减小间距以适应小屏 */
     }
 
-    /* 视频卡片优化 */
+    /* [修复点2] 视频卡片 - 恢复为垂直布局（上图下文） */
     .video-card {
         display: flex;
-        gap: 12px;
-        align-items: flex-start;
+        flex-direction: column; /* 关键：改为垂直排列 */
+        gap: 0;
+        align-items: stretch;
     }
 
+    /* [修复点3] 封面 - 恢复自适应宽度和比例 */
     .video-thumbnail {
         flex-shrink: 0;
-        width: 120px;
+        width: 100%;       /* 占满网格宽度 */
+        height: auto;      /* 高度自动 */
         padding-top: 0;
-        padding-bottom: 0;  /* ✅ 新增这行：强制清除底部内边距 */
-        height: 160px;      /* 固定高度 */
+        padding-bottom: 177.77%; /* 保持 9:16 比例 */
     }
+
     .video-info {
         flex: 1;
-        min-width: 0; /* 允许内容缩小 */
+        width: 100%;
+        padding-top: 8px; /* 增加一点顶部间距 */
     }
 
     .video-title {
-        font-size: 14px;
-        margin-bottom: 8px;
-        -webkit-line-clamp: 3; /* 最多3行 */
+        font-size: 13px;
+        margin-bottom: 6px;
+        -webkit-line-clamp: 2; /* 限制2行 */
     }
 
     .video-meta {
-        font-size: 11px;
+        font-size: 10px;
     }
 
     /* 分页 */
     .pagination-btn {
-        min-width: 36px;
-        min-height: 36px;
-        padding: 6px 10px;
-        font-size: 13px;
+        min-width: 32px;
+        min-height: 32px;
+        padding: 0 10px;
+        font-size: 12px;
     }
 }
 
