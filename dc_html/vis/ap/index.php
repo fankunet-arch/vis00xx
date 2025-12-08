@@ -32,6 +32,7 @@ $allowed_actions = [
     'category_save',        // 保存分类（预留）
     'product_quick_create', // 产品快速创建/搜索
     'series_quick_create',  // 系列快速创建/搜索
+    'search_titles',        // 搜索视频标题
 ];
 
 // 无需登录的action列表
@@ -71,6 +72,7 @@ $api_actions = [
     'category_save',        // 保存分类
     'product_quick_create', // 产品快速创建/搜索
     'series_quick_create',  // 系列快速创建/搜索
+    'search_titles',        // 搜索视频标题
 ];
 
 // 路由到对应的action或API文件 (在app目录中)

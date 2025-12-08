@@ -759,3 +759,32 @@ function vis_validate_file_type($mimeType, $extension) {
 
     return in_array($mimeType, $allowedMimes) && in_array(strtolower($extension), $allowedExts);
 }
+
+/**
+ * 搜索不重复的视频标题
+ * @param PDO $pdo
+ * @param string $keyword
+ * @param int $limit
+ * @return array
+ */
+function vis_search_video_titles($pdo, $keyword, $limit = 20) {
+    try {
+        $sql = "
+            SELECT DISTINCT title
+            FROM vis_videos
+            WHERE title LIKE :keyword
+            ORDER BY title ASC
+            LIMIT :limit
+        ";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':keyword', '%' . $keyword . '%');
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        vis_log('搜索视频标题失败: ' . $e->getMessage(), 'ERROR');
+        return [];
+    }
+}
