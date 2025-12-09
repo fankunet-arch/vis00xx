@@ -181,13 +181,14 @@ foreach ($seasons as $season) {
 
                                     <!-- 系列标签 -->
                                     <?php if (!empty($video['series_tags'])): ?>
-                                        <div class="badge-container" style="margin-top: 4px;">
+                                        <div class="badge-container" style="position: absolute; top: 38px; left: 10px; z-index: 3; display: flex; flex-wrap: wrap; gap: 4px;">
                                             <?php
                                             $tags = explode(',', $video['series_tags']);
                                             foreach (array_slice($tags, 0, 3) as $tag) {
-                                                echo '<span class="badge-season" style="background:#e0f7fa;color:#006064">' . htmlspecialchars($tag) . '</span> ';
+                                                // 移除 badge-season 类，手动应用样式以避免 position: absolute 冲突
+                                                echo '<span style="background:#e0f7fa; color:#006064; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,0.1);">' . htmlspecialchars($tag) . '</span> ';
                                             }
-                                            if (count($tags) > 3) echo '...';
+                                            // if (count($tags) > 3) echo '...'; // 空间有限，暂不显示省略号以免遮挡过多
                                             ?>
                                         </div>
                                     <?php endif; ?>
