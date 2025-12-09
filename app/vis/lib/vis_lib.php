@@ -245,12 +245,14 @@ function vis_get_signed_url($r2Key, $expiresIn = 300) {
  */
 function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
     try {
-        // 使用 GROUP_CONCAT 聚合系列信息
+        // [修复] Schema变更适配：
+        // vis_video_series_rel 存储的是 series_id，需要 JOIN vis_series 获取 series_name
         $sql = "
             SELECT v.*,
-                   GROUP_CONCAT(vs.series_name) as series_tags
+                   GROUP_CONCAT(s.series_name) as series_tags
             FROM vis_videos v
             LEFT JOIN vis_video_series_rel vs ON v.id = vs.video_id
+            LEFT JOIN vis_series s ON vs.series_id = s.id
             WHERE 1=1
         ";
         $params = [];
@@ -278,19 +280,26 @@ function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
             $params['product_id'] = $filters['product_id'];
         }
 
-        // 系列过滤 (通过关联表)
-        if (!empty($filters['series'])) {
+        // [重点修复] 系列ID过滤：必须查询关联表 vis_video_series_rel
+        if (!empty($filters['series_id'])) {
+            // 使用 EXISTS 子查询，查找关联表中是否有该视频ID和系列ID的匹配
             $sql .= " AND EXISTS (
                 SELECT 1 FROM vis_video_series_rel sub_vs
                 WHERE sub_vs.video_id = v.id
-                AND sub_vs.series_name = :series
+                AND sub_vs.series_id = :series_id
+            )";
+            $params['series_id'] = $filters['series_id'];
+        }
+
+        // 系列名称过滤 (兼容旧逻辑或名称搜索)
+        if (!empty($filters['series'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM vis_video_series_rel sub_vs
+                JOIN vis_series sub_s ON sub_vs.series_id = sub_s.id
+                WHERE sub_vs.video_id = v.id
+                AND sub_s.series_name = :series
             )";
             $params['series'] = $filters['series'];
-        }
-        // 兼容旧系列ID过滤
-        if (!empty($filters['series_id'])) {
-            $sql .= " AND v.series_id = :series_id";
-            $params['series_id'] = $filters['series_id'];
         }
 
         // 季节过滤
@@ -342,11 +351,22 @@ function vis_get_videos_count($pdo, $filters = []) {
             $params['category'] = $filters['category'];
         }
 
-        if (!empty($filters['series'])) {
+        // [重点修复] 系列ID过滤
+        if (!empty($filters['series_id'])) {
             $sql .= " AND EXISTS (
                 SELECT 1 FROM vis_video_series_rel sub_vs
                 WHERE sub_vs.video_id = v.id
-                AND sub_vs.series_name = :series
+                AND sub_vs.series_id = :series_id
+            )";
+            $params['series_id'] = $filters['series_id'];
+        }
+
+        if (!empty($filters['series'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM vis_video_series_rel sub_vs
+                JOIN vis_series sub_s ON sub_vs.series_id = sub_s.id
+                WHERE sub_vs.video_id = v.id
+                AND sub_s.series_name = :series
             )";
             $params['series'] = $filters['series'];
         }
@@ -359,11 +379,6 @@ function vis_get_videos_count($pdo, $filters = []) {
         if (!empty($filters['product_id'])) {
             $sql .= " AND v.product_id = :product_id";
             $params['product_id'] = $filters['product_id'];
-        }
-
-        if (!empty($filters['series_id'])) {
-            $sql .= " AND v.series_id = :series_id";
-            $params['series_id'] = $filters['series_id'];
         }
 
         if (!empty($filters['season_id'])) {
@@ -395,12 +410,14 @@ function vis_get_videos_count($pdo, $filters = []) {
  */
 function vis_get_video_by_id($pdo, $id) {
     try {
-        // 使用 GROUP_CONCAT 聚合系列信息
+        // [修复] Schema变更适配：
+        // vis_video_series_rel 存储的是 series_id，需要 JOIN vis_series 获取 series_name
         $stmt = $pdo->prepare("
             SELECT v.*,
-                   GROUP_CONCAT(vs.series_name) as series_tags
+                   GROUP_CONCAT(s.series_name) as series_tags
             FROM vis_videos v
             LEFT JOIN vis_video_series_rel vs ON v.id = vs.video_id
+            LEFT JOIN vis_series s ON vs.series_id = s.id
             WHERE v.id = :id
             GROUP BY v.id
             LIMIT 1
@@ -455,25 +472,41 @@ function vis_create_video($pdo, $data) {
         if (isset($data['series_names']) && is_array($data['series_names'])) {
             $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
             $createStmt = $pdo->prepare("INSERT IGNORE INTO vis_series (series_name, series_code) VALUES (?, ?)");
-            $relStmt = $pdo->prepare("INSERT INTO vis_video_series_rel (video_id, series_name) VALUES (?, ?)");
+            // [修正] Schema变更适配：插入时使用 series_id
+            $relStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
                 $seriesName = trim($seriesName);
                 if (empty($seriesName)) continue;
 
-                // 确保系列在 vis_series 表中存在
+                // 确保系列在 vis_series 表中存在，并获取 ID
                 $checkStmt->execute([$seriesName]);
-                if (!$checkStmt->fetch()) {
+                $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                
+                $currentSeriesId = null;
+                if ($seriesRow) {
+                    $currentSeriesId = $seriesRow['id'];
+                } else {
                     // 系列不存在，创建新系列
                     $seriesCode = 'series_' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $seriesName));
                     $createStmt->execute([$seriesName, $seriesCode]);
+                    $currentSeriesId = $pdo->lastInsertId();
+                    
+                    // 双重检查，防止并发导致的 id 为 0
+                    if (!$currentSeriesId) {
+                        $checkStmt->execute([$seriesName]);
+                        $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($seriesRow) $currentSeriesId = $seriesRow['id'];
+                    }
                 }
 
                 // 建立关联
-                try {
-                    $relStmt->execute([$videoId, $seriesName]);
-                } catch (PDOException $e) {
-                    // 忽略重复
+                if ($currentSeriesId) {
+                    try {
+                        $relStmt->execute([$videoId, $currentSeriesId]);
+                    } catch (PDOException $e) {
+                        // 忽略重复
+                    }
                 }
             }
         }
@@ -551,24 +584,38 @@ function vis_update_video($pdo, $id, $data) {
             // B. 插入新关联
             $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
             $createStmt = $pdo->prepare("INSERT IGNORE INTO vis_series (series_name, series_code) VALUES (?, ?)");
-            $relStmt = $pdo->prepare("INSERT INTO vis_video_series_rel (video_id, series_name) VALUES (?, ?)");
+            // [修正] 使用 series_id 插入
+            $relStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
                 $seriesName = trim($seriesName);
                 if (empty($seriesName)) continue;
 
-                // 确保系列在 vis_series 表中存在
+                // 查找或创建系列以获取 ID
                 $checkStmt->execute([$seriesName]);
-                if (!$checkStmt->fetch()) {
-                    // 系列不存在，创建新系列
+                $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                
+                $currentSeriesId = null;
+                if ($seriesRow) {
+                    $currentSeriesId = $seriesRow['id'];
+                } else {
                     $seriesCode = 'series_' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $seriesName));
                     $createStmt->execute([$seriesName, $seriesCode]);
+                    $currentSeriesId = $pdo->lastInsertId();
+                    
+                    if (!$currentSeriesId) {
+                        $checkStmt->execute([$seriesName]);
+                        $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($seriesRow) $currentSeriesId = $seriesRow['id'];
+                    }
                 }
 
-                try {
-                    $relStmt->execute([$id, $seriesName]);
-                } catch (PDOException $e) {
-                    // 忽略重复
+                if ($currentSeriesId) {
+                    try {
+                        $relStmt->execute([$id, $currentSeriesId]);
+                    } catch (PDOException $e) {
+                        // 忽略重复
+                    }
                 }
             }
         }
