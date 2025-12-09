@@ -16,6 +16,7 @@ $platform = $_GET['platform'] ?? '';
 $productId = $_GET['product_id'] ?? '';
 $seriesId = $_GET['series_id'] ?? '';
 $seasonId = $_GET['season_id'] ?? '';
+$keyword = $_GET['keyword'] ?? '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $limit = 20;
 $offset = ($page - 1) * $limit;
@@ -36,6 +37,9 @@ if (!empty($seriesId)) {
 }
 if (!empty($seasonId)) {
     $filters['season_id'] = $seasonId;
+}
+if (!empty($keyword)) {
+    $filters['keyword'] = $keyword;
 }
 
 // 获取视频列表和总数
@@ -127,7 +131,7 @@ foreach ($seasons as $season) {
 
                 <div class="search-container">
                     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="text" class="search-input" placeholder="搜索视频标题...">
+                    <input type="text" id="searchInput" class="search-input" placeholder="搜索视频标题..." value="<?php echo htmlspecialchars($keyword); ?>">
                 </div>
 
                 <a href="/vis/ap/index.php?action=admin_upload" class="btn btn-primary">
@@ -142,11 +146,56 @@ foreach ($seasons as $season) {
 
             <!-- 筛选栏 -->
             <div class="filter-bar">
-                <a href="?action=admin_list" class="filter-pill <?php echo empty($category) && empty($platform) ? 'active' : ''; ?>">全部</a>
-                <a href="?action=admin_list&platform=wechat" class="filter-pill <?php echo $platform === 'wechat' ? 'active' : ''; ?>">微信</a>
-                <a href="?action=admin_list&platform=xiaohongshu" class="filter-pill <?php echo $platform === 'xiaohongshu' ? 'active' : ''; ?>">小红书</a>
-                <a href="?action=admin_list&platform=douyin" class="filter-pill <?php echo $platform === 'douyin' ? 'active' : ''; ?>">抖音</a>
-                <a href="?action=admin_list&platform=other" class="filter-pill <?php echo $platform === 'other' ? 'active' : ''; ?>">其他</a>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                    <strong style="color: #666; font-size: 13px;">平台：</strong>
+                    <a href="?action=admin_list" class="filter-pill <?php echo empty($category) && empty($platform) && empty($productId) && empty($seriesId) && empty($seasonId) && empty($keyword) ? 'active' : ''; ?>">全部</a>
+                    <a href="?action=admin_list&platform=wechat" class="filter-pill <?php echo $platform === 'wechat' ? 'active' : ''; ?>">微信</a>
+                    <a href="?action=admin_list&platform=xiaohongshu" class="filter-pill <?php echo $platform === 'xiaohongshu' ? 'active' : ''; ?>">小红书</a>
+                    <a href="?action=admin_list&platform=douyin" class="filter-pill <?php echo $platform === 'douyin' ? 'active' : ''; ?>">抖音</a>
+                    <a href="?action=admin_list&platform=other" class="filter-pill <?php echo $platform === 'other' ? 'active' : ''; ?>">其他</a>
+                </div>
+
+                <?php if (!empty($products)): ?>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                    <strong style="color: #666; font-size: 13px;">产品：</strong>
+                    <a href="?action=admin_list" class="filter-pill <?php echo empty($productId) ? 'active' : ''; ?>">全部</a>
+                    <?php foreach ($products as $prod): ?>
+                        <a href="?action=admin_list&product_id=<?php echo $prod['id']; ?>"
+                           class="filter-pill <?php echo $productId == $prod['id'] ? 'active' : ''; ?>"
+                           title="<?php echo htmlspecialchars($prod['product_name']); ?>">
+                            <?php echo htmlspecialchars($prod['product_name']); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if (!empty($series)): ?>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                    <strong style="color: #666; font-size: 13px;">系列：</strong>
+                    <a href="?action=admin_list" class="filter-pill <?php echo empty($seriesId) ? 'active' : ''; ?>">全部</a>
+                    <?php foreach ($series as $s): ?>
+                        <a href="?action=admin_list&series_id=<?php echo $s['id']; ?>"
+                           class="filter-pill <?php echo $seriesId == $s['id'] ? 'active' : ''; ?>"
+                           title="<?php echo htmlspecialchars($s['series_name']); ?>">
+                            <?php echo htmlspecialchars($s['series_name']); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if (!empty($seasons)): ?>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <strong style="color: #666; font-size: 13px;">季节：</strong>
+                    <a href="?action=admin_list" class="filter-pill <?php echo empty($seasonId) ? 'active' : ''; ?>">全部</a>
+                    <?php foreach ($seasons as $season): ?>
+                        <a href="?action=admin_list&season_id=<?php echo $season['id']; ?>"
+                           class="filter-pill <?php echo $seasonId == $season['id'] ? 'active' : ''; ?>"
+                           title="<?php echo htmlspecialchars($season['season_name']); ?>">
+                            <?php echo htmlspecialchars($season['season_name']); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- 内容区域 -->
@@ -270,6 +319,7 @@ foreach ($seasons as $season) {
                                 'product_id' => $productId,
                                 'series_id' => $seriesId,
                                 'season_id' => $seasonId,
+                                'keyword' => $keyword,
                             ];
                             // 移除空参数
                             $paginationParams = array_filter($paginationParams, function($v) { return $v !== ''; });
@@ -299,6 +349,48 @@ foreach ($seasons as $season) {
 
     <script src="/vis/ap/js/modal.js"></script>
     <script>
+        // -----------------------------------------------------------------
+        // Search Functionality
+        // -----------------------------------------------------------------
+        (function() {
+            const searchInput = document.getElementById('searchInput');
+            if (!searchInput) return;
+
+            let searchTimeout = null;
+
+            // 搜索函数
+            function performSearch() {
+                const keyword = searchInput.value.trim();
+                const url = new URL(window.location.href);
+
+                // 清除当前的搜索参数和分页
+                url.searchParams.delete('keyword');
+                url.searchParams.delete('page');
+
+                // 如果有搜索关键词，添加到URL
+                if (keyword) {
+                    url.searchParams.set('keyword', keyword);
+                }
+
+                // 跳转到新的搜索结果页面
+                window.location.href = url.toString();
+            }
+
+            // 监听输入事件（防抖处理）
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(performSearch, 800); // 800ms后自动搜索
+            });
+
+            // 监听回车键
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    clearTimeout(searchTimeout);
+                    performSearch();
+                }
+            });
+        })();
+
         // -----------------------------------------------------------------
         // Edit Mode: Tagging Logic
         // -----------------------------------------------------------------
