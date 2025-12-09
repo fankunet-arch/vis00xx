@@ -583,7 +583,8 @@ function vis_update_video($pdo, $id, $data) {
 
             // B. 插入新关联
             $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
-            $createStmt = $pdo->prepare("INSERT IGNORE INTO vis_series (series_name, series_code) VALUES (?, ?)");
+            // [Fix] 移除内联的 createStmt，改用 vis_create_series 函数
+            
             // [修正] 使用 series_id 插入
             $relStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
@@ -599,18 +600,15 @@ function vis_update_video($pdo, $id, $data) {
                 if ($seriesRow) {
                     $currentSeriesId = $seriesRow['id'];
                 } else {
-                    $seriesCode = 'series_' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $seriesName));
-                    $createStmt->execute([$seriesName, $seriesCode]);
-                    $currentSeriesId = $pdo->lastInsertId();
-                    
-                    if (!$currentSeriesId) {
-                        $checkStmt->execute([$seriesName]);
-                        $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
-                        if ($seriesRow) $currentSeriesId = $seriesRow['id'];
+                    // [Fix] 使用标准函数创建系列，解决中文转码导致 series_code 重复从而插入失败的问题
+                    $newSeriesResult = vis_create_series($pdo, ['series_name' => $seriesName]);
+                    if ($newSeriesResult['success']) {
+                        $currentSeriesId = $newSeriesResult['id'];
                     }
                 }
 
                 if ($currentSeriesId) {
+
                     try {
                         $relStmt->execute([$id, $currentSeriesId]);
                     } catch (PDOException $e) {
