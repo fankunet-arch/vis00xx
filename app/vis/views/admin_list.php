@@ -146,56 +146,75 @@ foreach ($seasons as $season) {
 
             <!-- 筛选栏 -->
             <div class="filter-bar">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <strong style="color: #666; font-size: 13px;">平台：</strong>
-                    <a href="?action=admin_list" class="filter-pill <?php echo empty($category) && empty($platform) && empty($productId) && empty($seriesId) && empty($seasonId) && empty($keyword) ? 'active' : ''; ?>">全部</a>
-                    <a href="?action=admin_list&platform=wechat" class="filter-pill <?php echo $platform === 'wechat' ? 'active' : ''; ?>">微信</a>
-                    <a href="?action=admin_list&platform=xiaohongshu" class="filter-pill <?php echo $platform === 'xiaohongshu' ? 'active' : ''; ?>">小红书</a>
-                    <a href="?action=admin_list&platform=douyin" class="filter-pill <?php echo $platform === 'douyin' ? 'active' : ''; ?>">抖音</a>
-                    <a href="?action=admin_list&platform=other" class="filter-pill <?php echo $platform === 'other' ? 'active' : ''; ?>">其他</a>
-                </div>
+                <div class="filter-dropdowns">
+                    <!-- 平台筛选 -->
+                    <div class="filter-group">
+                        <label class="filter-label">平台：</label>
+                        <select id="platformFilter" class="filter-select">
+                            <option value="">全部</option>
+                            <option value="wechat" <?php echo $platform === 'wechat' ? 'selected' : ''; ?>>微信</option>
+                            <option value="xiaohongshu" <?php echo $platform === 'xiaohongshu' ? 'selected' : ''; ?>>小红书</option>
+                            <option value="douyin" <?php echo $platform === 'douyin' ? 'selected' : ''; ?>>抖音</option>
+                            <option value="other" <?php echo $platform === 'other' ? 'selected' : ''; ?>>其他</option>
+                        </select>
+                    </div>
 
-                <?php if (!empty($products)): ?>
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <strong style="color: #666; font-size: 13px;">产品：</strong>
-                    <a href="?action=admin_list" class="filter-pill <?php echo empty($productId) ? 'active' : ''; ?>">全部</a>
-                    <?php foreach ($products as $prod): ?>
-                        <a href="?action=admin_list&product_id=<?php echo $prod['id']; ?>"
-                           class="filter-pill <?php echo $productId == $prod['id'] ? 'active' : ''; ?>"
-                           title="<?php echo htmlspecialchars($prod['product_name']); ?>">
-                            <?php echo htmlspecialchars($prod['product_name']); ?>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-                <?php endif; ?>
+                    <?php if (!empty($products)): ?>
+                    <!-- 产品筛选 -->
+                    <div class="filter-group">
+                        <label class="filter-label">产品：</label>
+                        <select id="productFilter" class="filter-select">
+                            <option value="">全部</option>
+                            <?php foreach ($products as $prod): ?>
+                                <option value="<?php echo $prod['id']; ?>" <?php echo $productId == $prod['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($prod['product_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
 
-                <?php if (!empty($series)): ?>
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <strong style="color: #666; font-size: 13px;">系列：</strong>
-                    <a href="?action=admin_list" class="filter-pill <?php echo empty($seriesId) ? 'active' : ''; ?>">全部</a>
-                    <?php foreach ($series as $s): ?>
-                        <a href="?action=admin_list&series_id=<?php echo $s['id']; ?>"
-                           class="filter-pill <?php echo $seriesId == $s['id'] ? 'active' : ''; ?>"
-                           title="<?php echo htmlspecialchars($s['series_name']); ?>">
-                            <?php echo htmlspecialchars($s['series_name']); ?>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-                <?php endif; ?>
+                    <?php if (!empty($series)): ?>
+                    <!-- 系列筛选 -->
+                    <div class="filter-group">
+                        <label class="filter-label">系列：</label>
+                        <select id="seriesFilter" class="filter-select">
+                            <option value="">全部</option>
+                            <?php foreach ($series as $s): ?>
+                                <option value="<?php echo $s['id']; ?>" <?php echo $seriesId == $s['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($s['series_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
 
-                <?php if (!empty($seasons)): ?>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <strong style="color: #666; font-size: 13px;">季节：</strong>
-                    <a href="?action=admin_list" class="filter-pill <?php echo empty($seasonId) ? 'active' : ''; ?>">全部</a>
-                    <?php foreach ($seasons as $season): ?>
-                        <a href="?action=admin_list&season_id=<?php echo $season['id']; ?>"
-                           class="filter-pill <?php echo $seasonId == $season['id'] ? 'active' : ''; ?>"
-                           title="<?php echo htmlspecialchars($season['season_name']); ?>">
-                            <?php echo htmlspecialchars($season['season_name']); ?>
-                        </a>
-                    <?php endforeach; ?>
+                    <?php if (!empty($seasons)): ?>
+                    <!-- 季节筛选 -->
+                    <div class="filter-group">
+                        <label class="filter-label">季节：</label>
+                        <select id="seasonFilter" class="filter-select">
+                            <option value="">全部</option>
+                            <?php foreach ($seasons as $season): ?>
+                                <option value="<?php echo $season['id']; ?>" <?php echo $seasonId == $season['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($season['season_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- 清除所有筛选按钮 -->
+                    <?php if (!empty($platform) || !empty($productId) || !empty($seriesId) || !empty($seasonId)): ?>
+                    <button class="filter-clear-btn" onclick="clearAllFilters()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        清除筛选
+                    </button>
+                    <?php endif; ?>
                 </div>
-                <?php endif; ?>
             </div>
 
             <!-- 内容区域 -->
@@ -349,6 +368,60 @@ foreach ($seasons as $season) {
 
     <script src="/vis/ap/js/modal.js"></script>
     <script>
+        // -----------------------------------------------------------------
+        // Filter Dropdowns Functionality
+        // -----------------------------------------------------------------
+        (function() {
+            // 处理筛选器变化
+            function handleFilterChange() {
+                const url = new URL(window.location.href);
+
+                // 获取所有筛选值
+                const platform = document.getElementById('platformFilter')?.value || '';
+                const productId = document.getElementById('productFilter')?.value || '';
+                const seriesId = document.getElementById('seriesFilter')?.value || '';
+                const seasonId = document.getElementById('seasonFilter')?.value || '';
+
+                // 清除所有筛选参数
+                url.searchParams.delete('platform');
+                url.searchParams.delete('product_id');
+                url.searchParams.delete('series_id');
+                url.searchParams.delete('season_id');
+                url.searchParams.delete('page'); // 重置分页
+
+                // 添加非空的筛选参数
+                if (platform) url.searchParams.set('platform', platform);
+                if (productId) url.searchParams.set('product_id', productId);
+                if (seriesId) url.searchParams.set('series_id', seriesId);
+                if (seasonId) url.searchParams.set('season_id', seasonId);
+
+                // 跳转到新的筛选结果页面
+                window.location.href = url.toString();
+            }
+
+            // 为所有筛选下拉菜单添加事件监听
+            const filters = ['platformFilter', 'productFilter', 'seriesFilter', 'seasonFilter'];
+            filters.forEach(filterId => {
+                const filterElement = document.getElementById(filterId);
+                if (filterElement) {
+                    filterElement.addEventListener('change', handleFilterChange);
+                }
+            });
+        })();
+
+        // 清除所有筛选
+        function clearAllFilters() {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('platform');
+            url.searchParams.delete('product_id');
+            url.searchParams.delete('series_id');
+            url.searchParams.delete('season_id');
+            url.searchParams.delete('category');
+            url.searchParams.delete('keyword');
+            url.searchParams.delete('page');
+            window.location.href = url.toString();
+        }
+
         // -----------------------------------------------------------------
         // Search Functionality
         // -----------------------------------------------------------------
