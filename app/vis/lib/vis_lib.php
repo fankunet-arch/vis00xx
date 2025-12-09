@@ -439,6 +439,7 @@ function vis_get_video_by_id($pdo, $id) {
  */
 function vis_create_video($pdo, $data) {
     try {
+        // [方案B 重构] 移除 series_id 字段，只使用 vis_video_series_rel 多对多关系
         $stmt = $pdo->prepare("
             INSERT INTO vis_videos
             (title, platform, category, product_id, series_id, season_id,
@@ -455,7 +456,7 @@ function vis_create_video($pdo, $data) {
             'platform' => $data['platform'] ?? 'other',
             'category' => $data['category'] ?? 'product',
             'product_id' => $data['product_id'] ?? null,
-            'series_id' => $data['series_id'] ?? null,
+            'series_id' => null, // [重构] 不再写入 series_id，统一使用关联表
             'season_id' => $data['season_id'] ?? null,
             'r2_key' => $data['r2_key'],
             'cover_url' => $data['cover_url'] ?? null,
@@ -468,44 +469,20 @@ function vis_create_video($pdo, $data) {
 
         $videoId = $pdo->lastInsertId();
 
-        // 2. 插入系列关联 (支持多系列标签)
+        // [重构] 使用统一的辅助函数处理多系列标签
         if (isset($data['series_names']) && is_array($data['series_names'])) {
-            $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
-            $createStmt = $pdo->prepare("INSERT IGNORE INTO vis_series (series_name, series_code) VALUES (?, ?)");
-            // [修正] Schema变更适配：插入时使用 series_id
             $relStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
-                $seriesName = trim($seriesName);
-                if (empty($seriesName)) continue;
+                // 使用统一的"查找或创建"函数
+                $seriesId = _vis_ensure_series_exists($pdo, $seriesName);
 
-                // 确保系列在 vis_series 表中存在，并获取 ID
-                $checkStmt->execute([$seriesName]);
-                $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
-                
-                $currentSeriesId = null;
-                if ($seriesRow) {
-                    $currentSeriesId = $seriesRow['id'];
-                } else {
-                    // 系列不存在，创建新系列
-                    $seriesCode = 'series_' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $seriesName));
-                    $createStmt->execute([$seriesName, $seriesCode]);
-                    $currentSeriesId = $pdo->lastInsertId();
-                    
-                    // 双重检查，防止并发导致的 id 为 0
-                    if (!$currentSeriesId) {
-                        $checkStmt->execute([$seriesName]);
-                        $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
-                        if ($seriesRow) $currentSeriesId = $seriesRow['id'];
-                    }
-                }
-
-                // 建立关联
-                if ($currentSeriesId) {
+                if ($seriesId) {
                     try {
-                        $relStmt->execute([$videoId, $currentSeriesId]);
+                        $relStmt->execute([$videoId, $seriesId]);
                     } catch (PDOException $e) {
-                        // 忽略重复
+                        // 忽略重复键错误（主键冲突）
+                        vis_log("系列关联已存在: video_id={$videoId}, series_id={$seriesId}", 'DEBUG');
                     }
                 }
             }
@@ -537,6 +514,10 @@ function vis_create_video($pdo, $data) {
  */
 function vis_update_video($pdo, $id, $data) {
     try {
+        // [方案B 重构] 使用事务确保原子性（应对维度3：写操作的原子性）
+        $pdo->beginTransaction();
+
+        // 1. 更新主表字段
         $fields = [];
         $params = ['id' => $id];
 
@@ -560,10 +541,11 @@ function vis_update_video($pdo, $id, $data) {
             $params['product_id'] = $data['product_id'];
         }
 
-        if (isset($data['series_id'])) {
-            $fields[] = 'series_id = :series_id';
-            $params['series_id'] = $data['series_id'];
-        }
+        // [重构] 移除 series_id 更新，统一使用关联表
+        // if (isset($data['series_id'])) {
+        //     $fields[] = 'series_id = :series_id';
+        //     $params['series_id'] = $data['series_id'];
+        // }
 
         if (isset($data['season_id'])) {
             $fields[] = 'season_id = :season_id';
@@ -576,52 +558,42 @@ function vis_update_video($pdo, $id, $data) {
             $stmt->execute($params);
         }
 
-        // 2. 如果提供了 series_names 字段，更新关联表
+        // 2. [重构] 更新系列关联：全删全插模式（事务保证原子性）
         if (isset($data['series_names']) && is_array($data['series_names'])) {
-            // A. 删除旧关联
-            $pdo->prepare("DELETE FROM vis_video_series_rel WHERE video_id = ?")->execute([$id]);
+            // A. 删除所有旧关联
+            $deleteStmt = $pdo->prepare("DELETE FROM vis_video_series_rel WHERE video_id = ?");
+            $deleteStmt->execute([$id]);
 
-            // B. 插入新关联
-            $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
-            // [Fix] 移除内联的 createStmt，改用 vis_create_series 函数
-            
-            // [修正] 使用 series_id 插入
-            $relStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
+            // B. 插入所有新关联（使用统一的辅助函数）
+            $insertStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
-                $seriesName = trim($seriesName);
-                if (empty($seriesName)) continue;
+                // 使用统一的"查找或创建"函数
+                $seriesId = _vis_ensure_series_exists($pdo, $seriesName);
 
-                // 查找或创建系列以获取 ID
-                $checkStmt->execute([$seriesName]);
-                $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
-                
-                $currentSeriesId = null;
-                if ($seriesRow) {
-                    $currentSeriesId = $seriesRow['id'];
-                } else {
-                    // [Fix] 使用标准函数创建系列，解决中文转码导致 series_code 重复从而插入失败的问题
-                    $newSeriesResult = vis_create_series($pdo, ['series_name' => $seriesName]);
-                    if ($newSeriesResult['success']) {
-                        $currentSeriesId = $newSeriesResult['id'];
-                    }
-                }
-
-                if ($currentSeriesId) {
-
+                if ($seriesId) {
                     try {
-                        $relStmt->execute([$id, $currentSeriesId]);
+                        $insertStmt->execute([$id, $seriesId]);
                     } catch (PDOException $e) {
-                        // 忽略重复
+                        // 忽略重复键错误（理论上不应该发生，因为刚删除）
+                        vis_log("系列关联插入失败: video_id={$id}, series_id={$seriesId}, error={$e->getMessage()}", 'WARNING');
                     }
                 }
             }
         }
 
+        // 提交事务
+        $pdo->commit();
+
         vis_log("视频更新成功: ID={$id}", 'INFO');
 
         return ['success' => true, 'message' => '更新成功'];
     } catch (PDOException $e) {
+        // 回滚事务
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
         vis_log('更新视频失败: ' . $e->getMessage(), 'ERROR');
         return ['success' => false, 'message' => '更新失败: ' . $e->getMessage()];
     }
@@ -757,6 +729,43 @@ function vis_create_series($pdo, $data) {
         vis_log('创建系列失败: ' . $e->getMessage(), 'ERROR');
         return ['success' => false, 'id' => null, 'message' => '创建失败: ' . $e->getMessage()];
     }
+}
+
+/**
+ * 确保系列存在（查找或创建）- 内部辅助函数
+ * 统一的"find or create"逻辑，消除代码重复
+ *
+ * @param PDO $pdo
+ * @param string $seriesName 系列名称
+ * @return int|null 返回系列ID，失败返回null
+ */
+function _vis_ensure_series_exists($pdo, $seriesName) {
+    $seriesName = trim($seriesName);
+    if (empty($seriesName)) {
+        return null;
+    }
+
+    // 1. 尝试查找现有系列
+    $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
+    $checkStmt->execute([$seriesName]);
+    $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($seriesRow) {
+        return (int)$seriesRow['id'];
+    }
+
+    // 2. 系列不存在，创建新系列
+    $result = vis_create_series($pdo, ['series_name' => $seriesName]);
+
+    if ($result['success']) {
+        return (int)$result['id'];
+    }
+
+    // 3. 创建失败（可能是并发导致的唯一键冲突），再次查找
+    $checkStmt->execute([$seriesName]);
+    $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    return $seriesRow ? (int)$seriesRow['id'] : null;
 }
 
 // ============================================

@@ -128,53 +128,63 @@ try {
         }
     }
 
-    // 开启事务处理 (处理系列创建、产品创建、视频创建的一致性)
+    // [方案B 重构] 开启事务处理
+    // 简化逻辑：系列创建已内置在 vis_create_video() 中，这里只需处理产品
     $pdo->beginTransaction();
 
     try {
-        // 1. 处理系列 (如果未提供ID但提供了名称)
-        if (empty($seriesId) && !empty($seriesName)) {
-            // 检查系列是否存在
-            $stmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
-            $stmt->execute([$seriesName]);
-            $existingSeries = $stmt->fetch(PDO::FETCH_ASSOC);
+        // 1. [重构] 移除独立的系列创建逻辑
+        // 系列创建现在由 vis_create_video() 统一处理（通过 series_names 数组）
 
-            if ($existingSeries) {
-                $seriesId = $existingSeries['id'];
-            } else {
-                // 创建新系列
-                $seriesResult = vis_create_series($pdo, ['series_name' => $seriesName]);
-                if (!$seriesResult['success']) {
-                    throw new Exception('创建系列失败: ' . $seriesResult['message']);
-                }
-                $seriesId = $seriesResult['id'];
-            }
-        }
+        // 2. 处理产品（如果未提供ID但提供了名称）
+        $productSeriesName = null; // 用于存储产品关联的系列名称（作为默认建议）
 
-        // 2. 处理产品 (如果未提供ID但提供了名称)
         if (empty($productId) && !empty($productName)) {
             // 检查产品是否存在
-            $stmt = $pdo->prepare("SELECT id, series_id FROM vis_products WHERE product_name = ? LIMIT 1");
+            $stmt = $pdo->prepare("
+                SELECT p.id, s.series_name
+                FROM vis_products p
+                LEFT JOIN vis_series s ON p.series_id = s.id
+                WHERE p.product_name = ?
+                LIMIT 1
+            ");
             $stmt->execute([$productName]);
             $existingProduct = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($existingProduct) {
                 $productId = $existingProduct['id'];
-                // 如果没有指定系列，自动使用产品的系列
-                if (empty($seriesId) && !empty($existingProduct['series_id'])) {
-                    $seriesId = $existingProduct['series_id'];
-                }
+                // [维度4 解耦] 产品的系列仅作为"默认建议"
+                $productSeriesName = $existingProduct['series_name'];
             } else {
-                // 创建新产品 (必须有seriesId，除非业务允许无系列产品，这里假设新创建的产品如果有系列信息就带上)
+                // 创建新产品（使用第一个系列标签或 seriesName 作为产品的系列）
+                $productSeriesId = null;
+                if (!empty($seriesName)) {
+                    $productSeriesId = _vis_ensure_series_exists($pdo, $seriesName);
+                }
+
                 $productResult = vis_create_product($pdo, [
                     'product_name' => $productName,
-                    'series_id' => $seriesId // 使用前面解析出的seriesId
+                    'series_id' => $productSeriesId
                 ]);
+
                 if (!$productResult['success']) {
                     throw new Exception('创建产品失败: ' . $productResult['message']);
                 }
                 $productId = $productResult['id'];
+                $productSeriesName = $seriesName;
             }
+        }
+
+        // 3. [维度4 解耦] 将产品的系列作为默认建议添加到 series_names
+        // 但用户可以自由删除或修改（数据库层面不强制一致）
+        if (!empty($productSeriesName) && empty($seriesNames)) {
+            // 仅当用户没有手动指定系列标签时，才使用产品的系列作为默认值
+            $seriesNames = [$productSeriesName];
+        }
+
+        // 4. [兼容] 如果用户使用了旧的 seriesName 单选字段，合并到 seriesNames 数组
+        if (!empty($seriesName) && !in_array($seriesName, $seriesNames)) {
+            $seriesNames[] = $seriesName;
         }
 
         // 创建数据库记录
@@ -182,9 +192,9 @@ try {
             'title' => $title,
             'platform' => $platform,
             'category' => $category,
-            'series_names' => $seriesNames, // 传递系列标签数组
+            'series_names' => array_filter($seriesNames), // 传递系列标签数组（过滤空值）
             'product_id' => $productId,
-            'series_id' => $seriesId,
+            // [重构] 移除 series_id 参数，统一使用 series_names
             'season_id' => $seasonId,
             'r2_key' => $r2Key,
             'cover_url' => $coverUrl,
