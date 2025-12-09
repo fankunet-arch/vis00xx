@@ -503,6 +503,8 @@
 .form-control,
 .form-select {
     width: 100%;
+    height: auto; /* [新增] 覆盖 common.css 的 34px 限制，让 padding 决定高度 */
+    min-height: 42px; /* [新增] 确保高度足够舒适，适配 10px padding + 14px font */
     padding: 10px 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
