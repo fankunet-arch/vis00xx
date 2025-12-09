@@ -439,14 +439,14 @@ function vis_get_video_by_id($pdo, $id) {
  */
 function vis_create_video($pdo, $data) {
     try {
-        // [方案B 重构] 移除 series_id 字段，只使用 vis_video_series_rel 多对多关系
+        // [方案B 重构] 彻底移除 series_id 字段，只使用 vis_video_series_rel 多对多关系
         $stmt = $pdo->prepare("
             INSERT INTO vis_videos
-            (title, platform, category, product_id, series_id, season_id,
+            (title, platform, category, product_id, season_id,
              r2_key, cover_url, duration, file_size, mime_type,
              original_filename, created_by, status)
             VALUES
-            (:title, :platform, :category, :product_id, :series_id, :season_id,
+            (:title, :platform, :category, :product_id, :season_id,
              :r2_key, :cover_url, :duration, :file_size, :mime_type,
              :original_filename, :created_by, 'active')
         ");
@@ -456,7 +456,7 @@ function vis_create_video($pdo, $data) {
             'platform' => $data['platform'] ?? 'other',
             'category' => $data['category'] ?? 'product',
             'product_id' => $data['product_id'] ?? null,
-            'series_id' => null, // [重构] 不再写入 series_id，统一使用关联表
+            // [重构] series_id 已从 SQL 中彻底移除
             'season_id' => $data['season_id'] ?? null,
             'r2_key' => $data['r2_key'],
             'cover_url' => $data['cover_url'] ?? null,
