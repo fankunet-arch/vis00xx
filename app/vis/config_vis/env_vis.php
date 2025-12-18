@@ -2,7 +2,7 @@
 /**
  * VIS System Configuration
  * 文件路径: app/vis/config_vis/env_vis.php
- * 说明: VIS 系统配置文件
+ * 说明: VIS 系统配置文件 (QNAP QuObjects 适配版)
  */
 
 // 防止直接访问
@@ -11,30 +11,38 @@ if (!defined('VIS_ENTRY')) {
 }
 
 // ============================================
-// 数据库配置（复用MRS的数据库）
+// 数据库配置
 // ============================================
-define('VIS_DB_HOST', 'mhdlmskp2kpxguj.mysql.db');
+define('VIS_DB_HOST', '127.0.0.1');
 define('VIS_DB_PORT', '3306');
-define('VIS_DB_NAME', 'mhdlmskp2kpxguj');
-define('VIS_DB_USER', 'mhdlmskp2kpxguj');
+define('VIS_DB_NAME', 'mhdlmskp2kpxg');
+define('VIS_DB_USER', 'mhdlmskp2kpxg');
 define('VIS_DB_PASS', 'BWNrmksqMEqgbX37r3QNDJLGRrUka');
 define('VIS_DB_CHARSET', 'utf8mb4');
 
 // ============================================
-// Cloudflare R2 配置
+// QNAP QuObjects S3 配置
 // ============================================
-define('VIS_R2_ACCOUNT_ID', '5abbc858234958e8b524efcca03de6bf');  // TODO: 填写实际的Account ID
-define('VIS_R2_ACCESS_KEY_ID', '335ddb5dc9d85c57a1a47f5e549b0c51');    // TODO: 填写实际的Access Key ID
-define('VIS_R2_SECRET_ACCESS_KEY', '68100f3a4a1c75924c3e57f3cd4d5625fe653dd9484c5115f404d1039307afac');   // TODO: 填写实际的Secret Access Key
-define('VIS_R2_BUCKET_NAME', 'vis-videos');                  // R2存储桶名称
-define('VIS_R2_ENDPOINT', 'https://' . VIS_R2_ACCOUNT_ID . '.r2.cloudflarestorage.com'); // R2端点
-define('VIS_R2_REGION', 'auto');                             // R2区域（通常为auto）
+// 1. QNAP Access Key
+define('VIS_R2_ACCESS_KEY_ID', 'QuObjects:pFeTuLvjgBpSWukM8eX4'); 
 
-// R2公共访问域名（如果配置了Custom Domain）
-define('VIS_R2_PUBLIC_URL', 'https://vis.dc.abcabc.net');   // TODO: 配置R2的自定义域名
+// 2. QNAP Secret Key
+define('VIS_R2_SECRET_ACCESS_KEY', 'tybrN0C7CxUA81cafLlH5382mzTea96V'); 
 
-// 签名URL有效期（秒）
-define('VIS_SIGNED_URL_EXPIRES', 300); // 5分钟
+// 3. 存储桶名称
+define('VIS_R2_BUCKET_NAME', 'vis-videos'); 
+
+// 4. QNAP S3 服务地址 (后台上传用)
+define('VIS_R2_ENDPOINT', 'https://192.168.1.128:8010'); 
+
+// 5. 区域 (默认)
+define('VIS_R2_REGION', 'us-east-1');
+
+// 6. 公共访问域名 (前台显示用)
+define('VIS_R2_PUBLIC_URL', 'https://192.168.1.128:8010/v1/AUTH_QuObjects/vis-videos');
+
+// 签名URL有效期
+define('VIS_SIGNED_URL_EXPIRES', 300);
 
 // ============================================
 // 路径常量
@@ -49,18 +57,22 @@ define('VIS_API_PATH', VIS_APP_PATH . '/api');
 define('VIS_UPLOAD_TEMP_DIR', '/tmp/vis_uploads');
 
 // ============================================
-// 会话配置（VIS独立会话，避免与其他系统冲突）
+// 会话配置
 // ============================================
 define('VIS_SESSION_NAME', 'VIS_SESSID');
-define('VIS_SESSION_TIMEOUT', 1800); // 30分钟
+define('VIS_SESSION_TIMEOUT', 1800);
 define('VIS_SESSION_SAMESITE', 'Strict');
 
 // ============================================
 // 上传限制
 // ============================================
-define('VIS_MAX_FILE_SIZE', 100 * 1024 * 1024); // 100MB（可根据需要调整）
-define('VIS_ALLOWED_MIME_TYPES', ['video/mp4', 'video/quicktime']); // mp4, mov
+define('VIS_MAX_FILE_SIZE', 100 * 1024 * 1024);
+define('VIS_ALLOWED_MIME_TYPES', ['video/mp4', 'video/quicktime']);
 define('VIS_ALLOWED_EXTENSIONS', ['mp4', 'mov']);
+
+// ============================================
+// 核心系统函数 (之前丢失的部分)
+// ============================================
 
 /**
  * 获取数据库连接
@@ -99,24 +111,32 @@ function get_vis_db_connection() {
 }
 
 /**
- * 启动安全会话（复用MRS的会话配置）
+ * 启动安全会话
  */
 function vis_start_secure_session() {
     if (session_status() === PHP_SESSION_NONE) {
         $is_https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
 
+        // 尝试设置 session cookie 参数，但在某些环境可能需要调整
         ini_set('session.cookie_httponly', 1);
-        ini_set('session.cookie_secure', $is_https ? 1 : 0);
+        // 如果不是HTTPS环境，关闭 secure 标志以防无法登录
+        if ($is_https) {
+            ini_set('session.cookie_secure', 1);
+        }
         ini_set('session.use_strict_mode', 1);
-        ini_set('session.cookie_samesite', VIS_SESSION_SAMESITE);
+        
+        // 兼容性设置：如果设置 SameSite 导致问题，可注释掉
+        @ini_set('session.cookie_samesite', VIS_SESSION_SAMESITE);
 
         $params = session_get_cookie_params();
         session_name(VIS_SESSION_NAME);
+        
+        // 再次确保 cookie 参数正确
         session_set_cookie_params([
             'lifetime' => $params['lifetime'],
             'path' => $params['path'],
             'domain' => $params['domain'],
-            'secure' => $is_https,
+            'secure' => $is_https, // 自动检测
             'httponly' => true,
             'samesite' => VIS_SESSION_SAMESITE,
         ]);
@@ -132,9 +152,6 @@ function vis_start_secure_session() {
 
 /**
  * 日志记录函数
- * @param string $message
- * @param string $level
- * @param array $context
  */
 function vis_log($message, $level = 'INFO', $context = []) {
     $timestamp = date('Y-m-d H:i:s');
@@ -145,9 +162,6 @@ function vis_log($message, $level = 'INFO', $context = []) {
 
 /**
  * JSON响应输出
- * @param bool $success
- * @param mixed $data
- * @param string $message
  */
 function vis_json_response($success, $data = null, $message = '') {
     header('Content-Type: application/json; charset=utf-8');
@@ -161,7 +175,6 @@ function vis_json_response($success, $data = null, $message = '') {
 
 /**
  * 获取JSON输入
- * @return array|null
  */
 function vis_get_json_input() {
     $input = file_get_contents('php://input');

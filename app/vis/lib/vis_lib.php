@@ -2,10 +2,10 @@
 /**
  * VIS Video Inspiration System - Core Library
  * 文件路径: app/vis/lib/vis_lib.php
- * 说明: 核心业务逻辑函数
+ * 说明: 核心业务逻辑函数 (最终核准版)
  */
 
-// 加载R2客户端
+// 加载S3/R2客户端
 require_once __DIR__ . '/r2_client.php';
 
 // ============================================
@@ -13,11 +13,7 @@ require_once __DIR__ . '/r2_client.php';
 // ============================================
 
 /**
- * 验证用户登录（复用sys_users表）
- * @param PDO $pdo
- * @param string $username
- * @param string $password
- * @return array|false
+ * 验证用户登录
  */
 function vis_authenticate_user($pdo, $username, $password) {
     try {
@@ -63,7 +59,6 @@ function vis_authenticate_user($pdo, $username, $password) {
 
 /**
  * 创建用户会话
- * @param array $user
  */
 function vis_create_user_session($user) {
     vis_start_secure_session();
@@ -79,7 +74,6 @@ function vis_create_user_session($user) {
 
 /**
  * 检查用户是否登录
- * @return bool
  */
 function vis_is_user_logged_in() {
     vis_start_secure_session();
@@ -123,7 +117,7 @@ function vis_destroy_user_session() {
 }
 
 /**
- * 登录保护（跳转到VIS独立登录页面）
+ * 登录保护
  */
 function vis_require_login() {
     if (!vis_is_user_logged_in()) {
@@ -133,23 +127,23 @@ function vis_require_login() {
 }
 
 // ============================================
-// R2存储辅助函数
+// 存储辅助函数 (QNAP适配)
 // ============================================
 
 /**
- * 获取R2客户端实例
- * @return R2Client
+ * 获取存储客户端实例
  */
 function vis_get_r2_client() {
     static $client = null;
 
     if ($client === null) {
+        // 使用配置中的 Endpoint 和 Key 初始化客户端
         $client = new R2Client(
-            VIS_R2_ACCOUNT_ID,
-            VIS_R2_ACCESS_KEY_ID,
-            VIS_R2_SECRET_ACCESS_KEY,
-            VIS_R2_BUCKET_NAME,
-            VIS_R2_REGION
+            VIS_R2_ENDPOINT,          // QNAP IP:Port
+            VIS_R2_ACCESS_KEY_ID,     // Access Key
+            VIS_R2_SECRET_ACCESS_KEY, // Secret Key
+            VIS_R2_BUCKET_NAME,       // Bucket Name
+            VIS_R2_REGION             // Region
         );
     }
 
@@ -157,9 +151,7 @@ function vis_get_r2_client() {
 }
 
 /**
- * 生成R2存储路径（格式: vis/YYYYMM/uuid.ext）
- * @param string $extension 文件扩展名
- * @return string
+ * 生成随机存储路径 (格式: vis/YYYYMM/uuid.ext)
  */
 function vis_generate_r2_key($extension) {
     $yearMonth = date('Ym');
@@ -168,11 +160,7 @@ function vis_generate_r2_key($extension) {
 }
 
 /**
- * 上传文件到R2
- * @param string $localPath 本地文件路径
- * @param string $r2Key R2存储路径
- * @param string $mimeType MIME类型
- * @return array ['success' => bool, 'message' => string]
+ * 上传文件
  */
 function vis_upload_to_r2($localPath, $r2Key, $mimeType) {
     try {
@@ -187,15 +175,13 @@ function vis_upload_to_r2($localPath, $r2Key, $mimeType) {
 
         return $result;
     } catch (Exception $e) {
-        vis_log("R2上传异常: " . $e->getMessage(), 'ERROR');
+        vis_log("存储上传异常: " . $e->getMessage(), 'ERROR');
         return ['success' => false, 'message' => $e->getMessage()];
     }
 }
 
 /**
- * 从R2删除文件
- * @param string $r2Key R2存储路径
- * @return array ['success' => bool, 'message' => string]
+ * 删除文件
  */
 function vis_delete_from_r2($r2Key) {
     try {
@@ -203,23 +189,20 @@ function vis_delete_from_r2($r2Key) {
         $result = $client->deleteObject($r2Key);
 
         if ($result['success']) {
-            vis_log("R2文件删除成功: {$r2Key}", 'INFO');
+            vis_log("文件删除成功: {$r2Key}", 'INFO');
         } else {
-            vis_log("R2文件删除失败: {$r2Key} - " . $result['message'], 'ERROR');
+            vis_log("文件删除失败: {$r2Key} - " . $result['message'], 'ERROR');
         }
 
         return $result;
     } catch (Exception $e) {
-        vis_log("R2删除异常: " . $e->getMessage(), 'ERROR');
+        vis_log("存储删除异常: " . $e->getMessage(), 'ERROR');
         return ['success' => false, 'message' => $e->getMessage()];
     }
 }
 
 /**
- * 获取签名URL
- * @param string $r2Key R2存储路径
- * @param int $expiresIn 有效期（秒）
- * @return string|null
+ * 获取播放签名URL
  */
 function vis_get_signed_url($r2Key, $expiresIn = 300) {
     try {
@@ -232,21 +215,14 @@ function vis_get_signed_url($r2Key, $expiresIn = 300) {
 }
 
 // ============================================
-// 视频管理函数
+// 视频数据管理
 // ============================================
 
 /**
- * 获取视频列表
- * @param PDO $pdo
- * @param array $filters ['category' => '', 'platform' => '', 'product_id' => '', 'series_id' => '', 'season_id' => '', 'status' => 'active']
- * @param int $limit
- * @param int $offset
- * @return array
+ * 获取视频列表 (支持多系列筛选)
  */
 function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
     try {
-        // [修复] Schema变更适配：
-        // vis_video_series_rel 存储的是 series_id，需要 JOIN vis_series 获取 series_name
         $sql = "
             SELECT v.*,
                    GROUP_CONCAT(s.series_name) as series_tags
@@ -257,32 +233,27 @@ function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
         ";
         $params = [];
 
-        // 状态过滤（默认只显示active）
         $status = $filters['status'] ?? 'active';
         $sql .= " AND v.status = :status";
         $params['status'] = $status;
 
-        // 分类过滤
         if (!empty($filters['category'])) {
             $sql .= " AND v.category = :category";
             $params['category'] = $filters['category'];
         }
 
-        // 平台过滤
         if (!empty($filters['platform'])) {
             $sql .= " AND v.platform = :platform";
             $params['platform'] = $filters['platform'];
         }
 
-        // 产品过滤
         if (!empty($filters['product_id'])) {
             $sql .= " AND v.product_id = :product_id";
             $params['product_id'] = $filters['product_id'];
         }
 
-        // [重点修复] 系列ID过滤：必须查询关联表 vis_video_series_rel
+        // 系列筛选：使用 EXISTS 子查询
         if (!empty($filters['series_id'])) {
-            // 使用 EXISTS 子查询，查找关联表中是否有该视频ID和系列ID的匹配
             $sql .= " AND EXISTS (
                 SELECT 1 FROM vis_video_series_rel sub_vs
                 WHERE sub_vs.video_id = v.id
@@ -291,24 +262,11 @@ function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
             $params['series_id'] = $filters['series_id'];
         }
 
-        // 系列名称过滤 (兼容旧逻辑或名称搜索)
-        if (!empty($filters['series'])) {
-            $sql .= " AND EXISTS (
-                SELECT 1 FROM vis_video_series_rel sub_vs
-                JOIN vis_series sub_s ON sub_vs.series_id = sub_s.id
-                WHERE sub_vs.video_id = v.id
-                AND sub_s.series_name = :series
-            )";
-            $params['series'] = $filters['series'];
-        }
-
-        // 季节过滤
         if (!empty($filters['season_id'])) {
             $sql .= " AND v.season_id = :season_id";
             $params['season_id'] = $filters['season_id'];
         }
 
-        // 搜索关键词
         if (!empty($filters['keyword'])) {
             $sql .= " AND v.title LIKE :keyword";
             $params['keyword'] = '%' . $filters['keyword'] . '%';
@@ -333,9 +291,6 @@ function vis_get_videos($pdo, $filters = [], $limit = 50, $offset = 0) {
 
 /**
  * 获取视频总数
- * @param PDO $pdo
- * @param array $filters
- * @return int
  */
 function vis_get_videos_count($pdo, $filters = []) {
     try {
@@ -351,7 +306,6 @@ function vis_get_videos_count($pdo, $filters = []) {
             $params['category'] = $filters['category'];
         }
 
-        // [重点修复] 系列ID过滤
         if (!empty($filters['series_id'])) {
             $sql .= " AND EXISTS (
                 SELECT 1 FROM vis_video_series_rel sub_vs
@@ -359,16 +313,6 @@ function vis_get_videos_count($pdo, $filters = []) {
                 AND sub_vs.series_id = :series_id
             )";
             $params['series_id'] = $filters['series_id'];
-        }
-
-        if (!empty($filters['series'])) {
-            $sql .= " AND EXISTS (
-                SELECT 1 FROM vis_video_series_rel sub_vs
-                JOIN vis_series sub_s ON sub_vs.series_id = sub_s.id
-                WHERE sub_vs.video_id = v.id
-                AND sub_s.series_name = :series
-            )";
-            $params['series'] = $filters['series'];
         }
 
         if (!empty($filters['platform'])) {
@@ -403,15 +347,10 @@ function vis_get_videos_count($pdo, $filters = []) {
 }
 
 /**
- * 根据ID获取视频
- * @param PDO $pdo
- * @param int $id
- * @return array|null
+ * 根据ID获取视频详情
  */
 function vis_get_video_by_id($pdo, $id) {
     try {
-        // [修复] Schema变更适配：
-        // vis_video_series_rel 存储的是 series_id，需要 JOIN vis_series 获取 series_name
         $stmt = $pdo->prepare("
             SELECT v.*,
                    GROUP_CONCAT(s.series_name) as series_tags
@@ -432,14 +371,11 @@ function vis_get_video_by_id($pdo, $id) {
 }
 
 /**
- * 创建视频记录
- * @param PDO $pdo
- * @param array $data
- * @return array ['success' => bool, 'id' => int|null, 'message' => string]
+ * 创建视频记录 (写入数据库)
  */
 function vis_create_video($pdo, $data) {
     try {
-        // [方案B 重构] 彻底移除 series_id 字段，只使用 vis_video_series_rel 多对多关系
+        // 注意：不写入 series_id，使用多对多关联表
         $stmt = $pdo->prepare("
             INSERT INTO vis_videos
             (title, platform, category, product_id, season_id,
@@ -456,7 +392,6 @@ function vis_create_video($pdo, $data) {
             'platform' => $data['platform'] ?? 'other',
             'category' => $data['category'] ?? 'product',
             'product_id' => $data['product_id'] ?? null,
-            // [重构] series_id 已从 SQL 中彻底移除
             'season_id' => $data['season_id'] ?? null,
             'r2_key' => $data['r2_key'],
             'cover_url' => $data['cover_url'] ?? null,
@@ -469,20 +404,19 @@ function vis_create_video($pdo, $data) {
 
         $videoId = $pdo->lastInsertId();
 
-        // [重构] 使用统一的辅助函数处理多系列标签
+        // 处理系列标签 (Tag)
         if (isset($data['series_names']) && is_array($data['series_names'])) {
             $relStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
-                // 使用统一的"查找或创建"函数
+                // 查找或创建系列
                 $seriesId = _vis_ensure_series_exists($pdo, $seriesName);
 
                 if ($seriesId) {
                     try {
                         $relStmt->execute([$videoId, $seriesId]);
                     } catch (PDOException $e) {
-                        // 忽略重复键错误（主键冲突）
-                        vis_log("系列关联已存在: video_id={$videoId}, series_id={$seriesId}", 'DEBUG');
+                        // 忽略重复
                     }
                 }
             }
@@ -507,17 +441,11 @@ function vis_create_video($pdo, $data) {
 
 /**
  * 更新视频信息
- * @param PDO $pdo
- * @param int $id
- * @param array $data
- * @return array ['success' => bool, 'message' => string]
  */
 function vis_update_video($pdo, $id, $data) {
     try {
-        // [方案B 重构] 使用事务确保原子性（应对维度3：写操作的原子性）
         $pdo->beginTransaction();
 
-        // 1. 更新主表字段
         $fields = [];
         $params = ['id' => $id];
 
@@ -541,12 +469,6 @@ function vis_update_video($pdo, $id, $data) {
             $params['product_id'] = $data['product_id'];
         }
 
-        // [重构] 移除 series_id 更新，统一使用关联表
-        // if (isset($data['series_id'])) {
-        //     $fields[] = 'series_id = :series_id';
-        //     $params['series_id'] = $data['series_id'];
-        // }
-
         if (isset($data['season_id'])) {
             $fields[] = 'season_id = :season_id';
             $params['season_id'] = $data['season_id'];
@@ -558,65 +480,53 @@ function vis_update_video($pdo, $id, $data) {
             $stmt->execute($params);
         }
 
-        // 2. [重构] 更新系列关联：全删全插模式（事务保证原子性）
+        // 更新系列关联 (全删全插模式)
         if (isset($data['series_names']) && is_array($data['series_names'])) {
-            // A. 删除所有旧关联
             $deleteStmt = $pdo->prepare("DELETE FROM vis_video_series_rel WHERE video_id = ?");
             $deleteStmt->execute([$id]);
 
-            // B. 插入所有新关联（使用统一的辅助函数）
             $insertStmt = $pdo->prepare("INSERT IGNORE INTO vis_video_series_rel (video_id, series_id) VALUES (?, ?)");
 
             foreach ($data['series_names'] as $seriesName) {
-                // 使用统一的"查找或创建"函数
                 $seriesId = _vis_ensure_series_exists($pdo, $seriesName);
 
                 if ($seriesId) {
                     try {
                         $insertStmt->execute([$id, $seriesId]);
                     } catch (PDOException $e) {
-                        // 忽略重复键错误（理论上不应该发生，因为刚删除）
-                        vis_log("系列关联插入失败: video_id={$id}, series_id={$seriesId}, error={$e->getMessage()}", 'WARNING');
+                        // 忽略重复
                     }
                 }
             }
         }
 
-        // 提交事务
         $pdo->commit();
-
         vis_log("视频更新成功: ID={$id}", 'INFO');
-
         return ['success' => true, 'message' => '更新成功'];
+
     } catch (PDOException $e) {
-        // 回滚事务
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-
         vis_log('更新视频失败: ' . $e->getMessage(), 'ERROR');
         return ['success' => false, 'message' => '更新失败: ' . $e->getMessage()];
     }
 }
 
 /**
- * 删除视频（软删除 + 物理删除R2文件）
- * @param PDO $pdo
- * @param int $id
- * @return array ['success' => bool, 'message' => string]
+ * 删除视频 (逻辑删除数据库 + 物理删除文件)
  */
 function vis_delete_video($pdo, $id) {
     try {
         $pdo->beginTransaction();
 
-        // 获取视频信息
         $video = vis_get_video_by_id($pdo, $id);
         if (!$video) {
             $pdo->rollBack();
             return ['success' => false, 'message' => '视频不存在'];
         }
 
-        // 软删除数据库记录
+        // 软删除
         $stmt = $pdo->prepare("
             UPDATE vis_videos
             SET status = 'deleted', deleted_at = NOW(6)
@@ -624,30 +534,23 @@ function vis_delete_video($pdo, $id) {
         ");
         $stmt->execute(['id' => $id]);
 
-        // 1. 删除R2视频主文件
+        // 删除主文件
         $r2Result = vis_delete_from_r2($video['r2_key']);
 
-        // 2. [新增] 删除R2封面文件
-        // 逻辑：将视频路径后缀（如 .mp4）替换为 .jpg
-        // 例如：vis/202312/uuid.mp4 -> vis/202312/uuid.jpg
+        // 尝试删除封面图
         $coverKey = preg_replace('/\.[^.]+$/', '.jpg', $video['r2_key']);
-
-        // 确保生成的key有效且不等于原key（防止误删非扩展名文件）
         if ($coverKey && $coverKey !== $video['r2_key']) {
-             // 尝试删除封面，即使文件不存在（S3协议返回204）也视为成功，不影响主流程
              vis_delete_from_r2($coverKey);
         }
 
         if (!$r2Result['success']) {
-            // 如果R2删除失败，记录日志但不回滚数据库操作
-            vis_log("R2文件删除失败，但数据库已标记删除: ID={$id}, r2_key={$video['r2_key']}", 'WARNING');
+            vis_log("文件删除失败，但数据库已标记: ID={$id}", 'WARNING');
         }
 
         $pdo->commit();
-
         vis_log("视频删除成功: ID={$id}", 'INFO');
-
         return ['success' => true, 'message' => '删除成功'];
+
     } catch (PDOException $e) {
         $pdo->rollBack();
         vis_log('删除视频失败: ' . $e->getMessage(), 'ERROR');
@@ -656,195 +559,100 @@ function vis_delete_video($pdo, $id) {
 }
 
 // ============================================
-// 分类管理函数
+// 辅助元数据管理
 // ============================================
 
-/**
- * 获取所有分类
- * @param PDO $pdo
- * @return array
- */
 function vis_get_categories($pdo) {
     try {
-        $stmt = $pdo->query("
-            SELECT * FROM vis_categories
-            WHERE is_enabled = 1
-            ORDER BY sort_order ASC, id ASC
-        ");
+        $stmt = $pdo->query("SELECT * FROM vis_categories WHERE is_enabled = 1 ORDER BY sort_order ASC, id ASC");
         return $stmt->fetchAll();
     } catch (PDOException $e) {
-        vis_log('获取分类列表失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
 
-// ============================================
-// 系列管理函数
-// ============================================
-
-/**
- * 获取所有系列
- * @param PDO $pdo
- * @return array
- */
 function vis_get_series($pdo) {
     try {
-        $stmt = $pdo->query("
-            SELECT * FROM vis_series
-            WHERE is_enabled = 1
-            ORDER BY sort_order ASC, id ASC
-        ");
+        $stmt = $pdo->query("SELECT * FROM vis_series WHERE is_enabled = 1 ORDER BY sort_order ASC, id ASC");
         return $stmt->fetchAll();
     } catch (PDOException $e) {
-        vis_log('获取系列列表失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
 
-/**
- * 创建系列
- * @param PDO $pdo
- * @param array $data
- * @return array ['success' => bool, 'id' => int|null, 'message' => string]
- */
 function vis_create_series($pdo, $data) {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO vis_series (series_name, series_code, description, sort_order)
             VALUES (:series_name, :series_code, :description, :sort_order)
         ");
-
         $stmt->execute([
             'series_name' => $data['series_name'],
             'series_code' => $data['series_code'] ?? strtolower(preg_replace('/\s+/', '_', $data['series_name'])),
             'description' => $data['description'] ?? null,
             'sort_order' => $data['sort_order'] ?? 0
         ]);
-
-        $seriesId = $pdo->lastInsertId();
-        vis_log("系列创建成功: ID={$seriesId}, name={$data['series_name']}", 'INFO');
-
-        return ['success' => true, 'id' => $seriesId, 'message' => '系列创建成功'];
+        return ['success' => true, 'id' => $pdo->lastInsertId(), 'message' => '系列创建成功'];
     } catch (PDOException $e) {
-        vis_log('创建系列失败: ' . $e->getMessage(), 'ERROR');
-        return ['success' => false, 'id' => null, 'message' => '创建失败: ' . $e->getMessage()];
+        return ['success' => false, 'message' => '创建失败: ' . $e->getMessage()];
     }
 }
 
-/**
- * 确保系列存在（查找或创建）- 内部辅助函数
- * 统一的"find or create"逻辑，消除代码重复
- *
- * @param PDO $pdo
- * @param string $seriesName 系列名称
- * @return int|null 返回系列ID，失败返回null
- */
 function _vis_ensure_series_exists($pdo, $seriesName) {
     $seriesName = trim($seriesName);
-    if (empty($seriesName)) {
-        return null;
-    }
+    if (empty($seriesName)) return null;
 
-    // 1. 尝试查找现有系列
     $checkStmt = $pdo->prepare("SELECT id FROM vis_series WHERE series_name = ? LIMIT 1");
     $checkStmt->execute([$seriesName]);
     $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($seriesRow) {
-        return (int)$seriesRow['id'];
-    }
+    if ($seriesRow) return (int)$seriesRow['id'];
 
-    // 2. 系列不存在，创建新系列
     $result = vis_create_series($pdo, ['series_name' => $seriesName]);
+    if ($result['success']) return (int)$result['id'];
 
-    if ($result['success']) {
-        return (int)$result['id'];
-    }
-
-    // 3. 创建失败（可能是并发导致的唯一键冲突），再次查找
+    // 再次检查以防并发
     $checkStmt->execute([$seriesName]);
     $seriesRow = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
     return $seriesRow ? (int)$seriesRow['id'] : null;
 }
 
-// ============================================
-// 产品管理函数
-// ============================================
-
-/**
- * 获取所有产品
- * @param PDO $pdo
- * @param int|null $seriesId 可选，按系列筛选
- * @return array
- */
 function vis_get_products($pdo, $seriesId = null) {
     try {
-        $sql = "
-            SELECT p.*, s.series_name
-            FROM vis_products p
-            LEFT JOIN vis_series s ON p.series_id = s.id
-            WHERE p.is_enabled = 1
-        ";
-
-        if ($seriesId !== null) {
-            $sql .= " AND p.series_id = :series_id";
-        }
-
+        $sql = "SELECT p.*, s.series_name FROM vis_products p LEFT JOIN vis_series s ON p.series_id = s.id WHERE p.is_enabled = 1";
+        if ($seriesId !== null) $sql .= " AND p.series_id = :series_id";
         $sql .= " ORDER BY p.sort_order ASC, p.id ASC";
-
+        
         $stmt = $pdo->prepare($sql);
-        if ($seriesId !== null) {
-            $stmt->bindValue(':series_id', $seriesId, PDO::PARAM_INT);
-        }
+        if ($seriesId !== null) $stmt->bindValue(':series_id', $seriesId, PDO::PARAM_INT);
         $stmt->execute();
-
         return $stmt->fetchAll();
     } catch (PDOException $e) {
-        vis_log('获取产品列表失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
 
-/**
- * 根据产品名称搜索（支持快速创建）
- * @param PDO $pdo
- * @param string $keyword
- * @return array
- */
 function vis_search_products($pdo, $keyword) {
     try {
         $stmt = $pdo->prepare("
-            SELECT p.*, s.series_name
-            FROM vis_products p
-            LEFT JOIN vis_series s ON p.series_id = s.id
-            WHERE p.is_enabled = 1
-            AND p.product_name LIKE :keyword
-            ORDER BY p.product_name ASC
-            LIMIT 20
+            SELECT p.*, s.series_name FROM vis_products p 
+            LEFT JOIN vis_series s ON p.series_id = s.id 
+            WHERE p.is_enabled = 1 AND p.product_name LIKE :keyword 
+            ORDER BY p.product_name ASC LIMIT 20
         ");
-
         $stmt->execute(['keyword' => '%' . $keyword . '%']);
         return $stmt->fetchAll();
     } catch (PDOException $e) {
-        vis_log('搜索产品失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
 
-/**
- * 创建产品
- * @param PDO $pdo
- * @param array $data
- * @return array ['success' => bool, 'id' => int|null, 'message' => string]
- */
 function vis_create_product($pdo, $data) {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO vis_products (product_name, product_code, series_id, description, sort_order)
             VALUES (:product_name, :product_code, :series_id, :description, :sort_order)
         ");
-
         $stmt->execute([
             'product_name' => $data['product_name'],
             'product_code' => $data['product_code'] ?? strtolower(preg_replace('/\s+/', '_', $data['product_name'])),
@@ -852,110 +660,50 @@ function vis_create_product($pdo, $data) {
             'description' => $data['description'] ?? null,
             'sort_order' => $data['sort_order'] ?? 0
         ]);
-
-        $productId = $pdo->lastInsertId();
-        vis_log("产品创建成功: ID={$productId}, name={$data['product_name']}", 'INFO');
-
-        return ['success' => true, 'id' => $productId, 'message' => '产品创建成功'];
+        return ['success' => true, 'id' => $pdo->lastInsertId(), 'message' => '产品创建成功'];
     } catch (PDOException $e) {
-        vis_log('创建产品失败: ' . $e->getMessage(), 'ERROR');
-        return ['success' => false, 'id' => null, 'message' => '创建失败: ' . $e->getMessage()];
+        return ['success' => false, 'message' => '创建失败: ' . $e->getMessage()];
     }
 }
 
-// ============================================
-// 季节管理函数
-// ============================================
-
-/**
- * 获取所有季节
- * @param PDO $pdo
- * @return array
- */
 function vis_get_seasons($pdo) {
     try {
-        $stmt = $pdo->query("
-            SELECT * FROM vis_seasons
-            WHERE is_enabled = 1
-            ORDER BY sort_order ASC, id ASC
-        ");
+        $stmt = $pdo->query("SELECT * FROM vis_seasons WHERE is_enabled = 1 ORDER BY sort_order ASC, id ASC");
         return $stmt->fetchAll();
     } catch (PDOException $e) {
-        vis_log('获取季节列表失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
 
-// ============================================
-// 辅助函数
-// ============================================
-
-/**
- * 验证文件类型
- * @param string $mimeType
- * @param string $extension
- * @return bool
- */
 function vis_validate_file_type($mimeType, $extension) {
-    $allowedMimes = VIS_ALLOWED_MIME_TYPES;
-    $allowedExts = VIS_ALLOWED_EXTENSIONS;
-
-    return in_array($mimeType, $allowedMimes) && in_array(strtolower($extension), $allowedExts);
+    return in_array($mimeType, VIS_ALLOWED_MIME_TYPES) && in_array(strtolower($extension), VIS_ALLOWED_EXTENSIONS);
 }
 
-/**
- * 搜索系列字典
- * @param PDO $pdo
- * @param string $keyword
- * @param int $limit
- * @return array
- */
 function vis_search_series_dict($pdo, $keyword, $limit = 20) {
     try {
         $stmt = $pdo->prepare("
-            SELECT series_name as name
-            FROM vis_series
-            WHERE series_name LIKE :keyword
-              AND is_enabled = 1
-            ORDER BY sort_order ASC, series_name ASC
-            LIMIT :limit
+            SELECT series_name as name FROM vis_series 
+            WHERE series_name LIKE :keyword AND is_enabled = 1 
+            ORDER BY sort_order ASC, series_name ASC LIMIT :limit
         ");
         $stmt->bindValue(':keyword', '%' . $keyword . '%');
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
-
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     } catch (PDOException $e) {
-        vis_log('搜索系列失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
 
-/**
- * 搜索不重复的视频标题
- * @param PDO $pdo
- * @param string $keyword
- * @param int $limit
- * @return array
- */
 function vis_search_video_titles($pdo, $keyword, $limit = 20) {
     try {
-        $sql = "
-            SELECT DISTINCT title
-            FROM vis_videos
-            WHERE title LIKE :keyword
-            ORDER BY title ASC
-            LIMIT :limit
-        ";
-
+        $sql = "SELECT DISTINCT title FROM vis_videos WHERE title LIKE :keyword ORDER BY title ASC LIMIT :limit";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':keyword', '%' . $keyword . '%');
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
-
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     } catch (PDOException $e) {
-        vis_log('搜索视频标题失败: ' . $e->getMessage(), 'ERROR');
         return [];
     }
 }
