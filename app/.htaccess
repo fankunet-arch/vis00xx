@@ -1,0 +1,13 @@
+# DMS Archive System - Security Protection
+# Prevent direct web access to all files in /app directory
+
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
