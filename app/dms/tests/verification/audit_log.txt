@@ -1,0 +1,291 @@
+Array
+(
+    [0] => Array
+        (
+            [log_id] => 1
+            [action] => login_failed
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [1] => Array
+        (
+            [log_id] => 2
+            [action] => login_failed
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [2] => Array
+        (
+            [log_id] => 3
+            [action] => login
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [3] => Array
+        (
+            [log_id] => 4
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 1
+        )
+
+    [4] => Array
+        (
+            [log_id] => 5
+            [action] => download
+            [entity_type] => version
+            [entity_id] => 1
+        )
+
+    [5] => Array
+        (
+            [log_id] => 6
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 1
+        )
+
+    [6] => Array
+        (
+            [log_id] => 7
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 1
+        )
+
+    [7] => Array
+        (
+            [log_id] => 8
+            [action] => login
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [8] => Array
+        (
+            [log_id] => 9
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 2
+        )
+
+    [9] => Array
+        (
+            [log_id] => 10
+            [action] => download
+            [entity_type] => version
+            [entity_id] => 2
+        )
+
+    [10] => Array
+        (
+            [log_id] => 11
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 2
+        )
+
+    [11] => Array
+        (
+            [log_id] => 12
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 2
+        )
+
+    [12] => Array
+        (
+            [log_id] => 13
+            [action] => login
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [13] => Array
+        (
+            [log_id] => 14
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 3
+        )
+
+    [14] => Array
+        (
+            [log_id] => 15
+            [action] => download
+            [entity_type] => version
+            [entity_id] => 3
+        )
+
+    [15] => Array
+        (
+            [log_id] => 16
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 3
+        )
+
+    [16] => Array
+        (
+            [log_id] => 17
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 3
+        )
+
+    [17] => Array
+        (
+            [log_id] => 18
+            [action] => login
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [18] => Array
+        (
+            [log_id] => 19
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 4
+        )
+
+    [19] => Array
+        (
+            [log_id] => 20
+            [action] => download
+            [entity_type] => version
+            [entity_id] => 4
+        )
+
+    [20] => Array
+        (
+            [log_id] => 21
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 4
+        )
+
+    [21] => Array
+        (
+            [log_id] => 22
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 4
+        )
+
+    [22] => Array
+        (
+            [log_id] => 23
+            [action] => login
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [23] => Array
+        (
+            [log_id] => 24
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 5
+        )
+
+    [24] => Array
+        (
+            [log_id] => 25
+            [action] => download
+            [entity_type] => version
+            [entity_id] => 5
+        )
+
+    [25] => Array
+        (
+            [log_id] => 26
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 5
+        )
+
+    [26] => Array
+        (
+            [log_id] => 27
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 5
+        )
+
+    [27] => Array
+        (
+            [log_id] => 28
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 6
+        )
+
+    [28] => Array
+        (
+            [log_id] => 29
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 6
+        )
+
+    [29] => Array
+        (
+            [log_id] => 30
+            [action] => login
+            [entity_type] => user
+            [entity_id] => 1
+        )
+
+    [30] => Array
+        (
+            [log_id] => 31
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 7
+        )
+
+    [31] => Array
+        (
+            [log_id] => 32
+            [action] => download
+            [entity_type] => version
+            [entity_id] => 7
+        )
+
+    [32] => Array
+        (
+            [log_id] => 33
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 7
+        )
+
+    [33] => Array
+        (
+            [log_id] => 34
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 7
+        )
+
+    [34] => Array
+        (
+            [log_id] => 35
+            [action] => upload
+            [entity_type] => version
+            [entity_id] => 8
+        )
+
+    [35] => Array
+        (
+            [log_id] => 36
+            [action] => preview
+            [entity_type] => version
+            [entity_id] => 8
+        )
+
+)

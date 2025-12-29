@@ -28,6 +28,7 @@ $view_actions = [
 ];
 
 $api_actions = [
+    'do_login',                 // API: Process login
     'do_logout',                // API: Logout
     'doc_upload_submit',        // API: Upload document
     'version_upload_submit',    // API: Upload new version
