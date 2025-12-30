@@ -239,7 +239,7 @@ a:hover {
     transform: translateY(0);
 }
 
-.nav-dropdown-menu a {
+.nav-dropdown .nav-dropdown-menu a {
     display: block;
     color: var(--gray-700);
     padding: 0.625rem 1.125rem;
@@ -247,11 +247,11 @@ a:hover {
     border-radius: 0;
 }
 
-.nav-dropdown-menu a::before {
+.nav-dropdown .nav-dropdown-menu a::before {
     display: none;
 }
 
-.nav-dropdown-menu a:hover {
+.nav-dropdown .nav-dropdown-menu a:hover {
     background: var(--gray-50);
     color: var(--primary-color);
 }
