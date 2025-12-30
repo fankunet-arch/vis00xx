@@ -29,6 +29,8 @@ $view_actions = [
     'doc_upload',       // View: Upload document
     'category_list',    // View: Category management
     'category_edit',    // View: Edit category
+    'project_list',     // View: Project management
+    'project_edit',     // View: Edit project
 ];
 
 $api_actions = [
@@ -42,6 +44,8 @@ $api_actions = [
     'file_download',            // API: Download file (proxy)
     'file_preview',             // API: Preview file (proxy)
     'category_save',            // API: Save category
+    'project_save',             // API: Save project
+    'project_delete',           // API: Delete project
 ];
 
 $allowed_actions = array_merge($public_actions, $view_actions, $api_actions);
@@ -90,6 +94,8 @@ $view_map = [
     'doc_upload' => 'doc_upload',
     'category_list' => 'category_list',
     'category_edit' => 'category_edit',
+    'project_list' => 'project_list',
+    'project_edit' => 'project_edit',
 ];
 
 if (isset($view_map[$action])) {

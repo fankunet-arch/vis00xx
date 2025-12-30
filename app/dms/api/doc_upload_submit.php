@@ -25,6 +25,7 @@ try {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+    $project_id = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
     $tags = trim($_POST['tags'] ?? '');
     $attributes = !empty($_POST['attributes']) ? json_decode($_POST['attributes'], true) : [];
     $upload_mode = $_POST['upload_mode'] ?? 'append';
@@ -81,6 +82,7 @@ try {
             $doc_id = dms_db_create_document([
                 'org_id' => 1,
                 'category_id' => $category_id,
+                'project_id' => $project_id,
                 'title' => $title,
                 'description' => $description,
                 'tags' => $tags,

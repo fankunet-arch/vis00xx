@@ -160,6 +160,11 @@ function dms_db_get_documents(array $filters = [], int $limit = 25, int $offset 
         $params['category_id'] = $filters['category_id'];
     }
 
+    if (!empty($filters['project_id'])) {
+        $where[] = 'd.project_id = :project_id';
+        $params['project_id'] = $filters['project_id'];
+    }
+
     if (!empty($filters['search'])) {
         $where[] = '(d.title LIKE :search OR d.description LIKE :search OR d.tags LIKE :search)';
         $params['search'] = '%' . $filters['search'] . '%';
@@ -168,9 +173,10 @@ function dms_db_get_documents(array $filters = [], int $limit = 25, int $offset 
     $where_sql = implode(' AND ', $where);
 
     $stmt = $DMS_DB->prepare("
-        SELECT d.*, c.name AS category_name, u.full_name AS created_by_name
+        SELECT d.*, c.name AS category_name, p.name AS project_name, u.full_name AS created_by_name
         FROM dms_documents d
         LEFT JOIN dms_categories c ON d.category_id = c.category_id
+        LEFT JOIN dms_projects p ON d.project_id = p.project_id
         LEFT JOIN dms_users u ON d.created_by = u.user_id
         WHERE {$where_sql}
         ORDER BY d.created_at DESC
@@ -203,6 +209,11 @@ function dms_db_count_documents(array $filters = []): int {
         $params['category_id'] = $filters['category_id'];
     }
 
+    if (!empty($filters['project_id'])) {
+        $where[] = 'project_id = :project_id';
+        $params['project_id'] = $filters['project_id'];
+    }
+
     if (!empty($filters['search'])) {
         $where[] = '(title LIKE :search OR description LIKE :search OR tags LIKE :search)';
         $params['search'] = '%' . $filters['search'] . '%';
@@ -223,9 +234,10 @@ function dms_db_count_documents(array $filters = []): int {
 function dms_db_get_document(string $doc_id) {
     global $DMS_DB;
     $stmt = $DMS_DB->prepare('
-        SELECT d.*, c.name AS category_name, c.schema_json AS category_schema
+        SELECT d.*, c.name AS category_name, c.schema_json AS category_schema, p.name AS project_name
         FROM dms_documents d
         LEFT JOIN dms_categories c ON d.category_id = c.category_id
+        LEFT JOIN dms_projects p ON d.project_id = p.project_id
         WHERE d.doc_id = :doc_id
         LIMIT 1
     ');
@@ -245,15 +257,16 @@ function dms_db_create_document(array $data): string {
 
     $stmt = $DMS_DB->prepare('
         INSERT INTO dms_documents
-        (doc_id, org_id, category_id, title, description, tags, attributes_json, created_by)
+        (doc_id, org_id, category_id, project_id, title, description, tags, attributes_json, created_by)
         VALUES
-        (:doc_id, :org_id, :category_id, :title, :description, :tags, :attributes_json, :created_by)
+        (:doc_id, :org_id, :category_id, :project_id, :title, :description, :tags, :attributes_json, :created_by)
     ');
 
     $stmt->execute([
         'doc_id' => $doc_id,
         'org_id' => $data['org_id'] ?? 1,
         'category_id' => $data['category_id'] ?? null,
+        'project_id' => $data['project_id'] ?? null,
         'title' => $data['title'],
         'description' => $data['description'] ?? null,
         'tags' => $data['tags'] ?? null,
@@ -278,6 +291,10 @@ function dms_db_update_document(string $doc_id, array $data): void {
     if (array_key_exists('category_id', $data)) {
         $fields[] = 'category_id = :category_id';
         $params['category_id'] = $data['category_id'];
+    }
+    if (array_key_exists('project_id', $data)) {
+        $fields[] = 'project_id = :project_id';
+        $params['project_id'] = $data['project_id'];
     }
     if (array_key_exists('title', $data)) {
         $fields[] = 'title = :title';
@@ -451,4 +468,105 @@ function dms_db_queue_object_deletion(string $bucket, string $key, ?string $doc_
         'doc_id' => $doc_id,
         'version_id' => $version_id,
     ]);
+}
+
+/**
+ * Get all projects
+ * @param int $org_id
+ * @param bool $active_only Return only active projects
+ * @return array
+ */
+function dms_db_get_projects(int $org_id = 1, bool $active_only = true): array {
+    global $DMS_DB;
+
+    $where = 'org_id = :org_id';
+    if ($active_only) {
+        $where .= ' AND is_active = 1';
+    }
+
+    $stmt = $DMS_DB->prepare("
+        SELECT * FROM dms_projects
+        WHERE {$where}
+        ORDER BY name ASC
+    ");
+    $stmt->execute(['org_id' => $org_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Get project by ID
+ * @param int $project_id
+ * @return array|false
+ */
+function dms_db_get_project(int $project_id) {
+    global $DMS_DB;
+    $stmt = $DMS_DB->prepare('SELECT * FROM dms_projects WHERE project_id = :id LIMIT 1');
+    $stmt->execute(['id' => $project_id]);
+    return $stmt->fetch();
+}
+
+/**
+ * Create or update project
+ * @param array $data
+ * @return int Project ID
+ */
+function dms_db_save_project(array $data): int {
+    global $DMS_DB;
+
+    if (!empty($data['project_id'])) {
+        // Update existing
+        $stmt = $DMS_DB->prepare('
+            UPDATE dms_projects
+            SET name = :name, code = :code, description = :description, status = :status
+            WHERE project_id = :project_id
+        ');
+        $stmt->execute([
+            'project_id' => $data['project_id'],
+            'name' => $data['name'],
+            'code' => $data['code'] ?? null,
+            'description' => $data['description'] ?? null,
+            'status' => $data['status'] ?? 'active',
+        ]);
+        return (int)$data['project_id'];
+    } else {
+        // Insert new
+        $stmt = $DMS_DB->prepare('
+            INSERT INTO dms_projects (org_id, name, code, description, status, created_by)
+            VALUES (:org_id, :name, :code, :description, :status, :created_by)
+        ');
+        $stmt->execute([
+            'org_id' => $data['org_id'] ?? 1,
+            'name' => $data['name'],
+            'code' => $data['code'] ?? null,
+            'description' => $data['description'] ?? null,
+            'status' => $data['status'] ?? 'active',
+            'created_by' => $data['created_by'] ?? null,
+        ]);
+        return (int)$DMS_DB->lastInsertId();
+    }
+}
+
+/**
+ * Delete project (soft delete)
+ * @param int $project_id
+ */
+function dms_db_delete_project(int $project_id): void {
+    global $DMS_DB;
+    $stmt = $DMS_DB->prepare('UPDATE dms_projects SET is_active = 0 WHERE project_id = :id');
+    $stmt->execute(['id' => $project_id]);
+}
+
+/**
+ * Count active documents in project
+ * @param int $project_id
+ * @return int
+ */
+function dms_db_count_project_documents(int $project_id): int {
+    global $DMS_DB;
+    $stmt = $DMS_DB->prepare("
+        SELECT COUNT(*) FROM dms_documents
+        WHERE project_id = :project_id AND status = 'active'
+    ");
+    $stmt->execute(['project_id' => $project_id]);
+    return (int)$stmt->fetchColumn();
 }

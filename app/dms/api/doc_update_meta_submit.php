@@ -35,6 +35,7 @@ try {
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $category_id = !empty($_POST['category_id']) ? (int)$_POST['category_id'] : null;
+    $project_id = !empty($_POST['project_id']) ? (int)$_POST['project_id'] : null;
     $tags = trim($_POST['tags'] ?? '');
     $attributes = !empty($_POST['attributes']) ? json_decode($_POST['attributes'], true) : [];
 
@@ -65,6 +66,7 @@ try {
         'title' => $title,
         'description' => $description,
         'category_id' => $category_id,
+        'project_id' => $project_id,
         'tags' => $tags,
         'attributes' => $attributes,
     ]);
