@@ -49,9 +49,9 @@
     --shadow-xl: 0 20px 40px -8px rgba(0, 0, 0, 0.2);
 
     /* 过渡动画 */
-    --transition-fast: 0.15s ease;
-    --transition-base: 0.25s ease;
-    --transition-slow: 0.35s ease;
+    --transition-fast: 0.1s ease;
+    --transition-base: 0.15s ease;
+    --transition-slow: 0.25s ease;
 }
 
 body {
@@ -379,6 +379,29 @@ a:hover {
     line-height: 1.4;
 }
 
+/* 表单网格布局 */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 0;
+}
+
+.form-row .form-group {
+    margin-bottom: 0;
+}
+
+.form-group-full {
+    grid-column: 1 / -1;
+}
+
+/* 响应式：小屏幕时改为单列 */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .form-actions {
     margin-top: 2rem;
     display: flex;
@@ -437,6 +460,7 @@ a:hover {
 }
 
 .btn-primary:hover {
+    color: white;
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
     border-color: transparent;
@@ -455,6 +479,7 @@ a:hover {
 }
 
 .btn-danger:hover {
+    color: white;
     background: var(--danger-hover);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
@@ -468,6 +493,7 @@ a:hover {
 }
 
 .btn-success:hover {
+    color: white;
     background: var(--success-hover);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);

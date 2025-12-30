@@ -62,10 +62,12 @@ $categories = dms_db_get_categories();
                         <p><?= dms_escape($doc['description']) ?></p>
                     </div>
                 <?php else: ?>
-                    <!-- New document fields -->
-                    <div class="form-group">
-                        <label for="title">文档标题 *</label>
-                        <input type="text" id="title" name="title" required>
+                    <!-- New document fields - 两列布局 -->
+                    <div class="form-row">
+                        <div class="form-group form-group-full">
+                            <label for="title">文档标题 *</label>
+                            <input type="text" id="title" name="title" required>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -73,43 +75,45 @@ $categories = dms_db_get_categories();
                         <textarea id="description" name="description" rows="4"></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label for="category_id">分类</label>
-                        <select id="category_id" name="category_id">
-                            <option value="">无</option>
-                            <?php foreach ($categories as $cat): ?>
-                                <option value="<?= $cat['category_id'] ?>"><?= dms_escape($cat['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="category_id">分类</label>
+                            <select id="category_id" name="category_id">
+                                <option value="">无</option>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?= $cat['category_id'] ?>"><?= dms_escape($cat['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="tags">标签（用逗号分隔）</label>
-                        <input type="text" id="tags" name="tags" placeholder="例如：发票、2024、紧急">
+                        <div class="form-group">
+                            <label for="tags">标签（用逗号分隔）</label>
+                            <input type="text" id="tags" name="tags" placeholder="例如：发票、2024、紧急">
+                        </div>
                     </div>
                 <?php endif; ?>
 
-                <!-- File upload -->
+                <!-- File upload and settings - 两列布局 -->
                 <div class="form-group">
                     <label for="file">文件 *</label>
                     <input type="file" id="file" name="file" required>
-                    <small>最大大小：<?= $DMS_CONFIG['upload_max_mb'] ?> MB</small>
-                    <small>允许的类型：<?= implode(', ', array_slice($DMS_CONFIG['allowed_exts'], 0, 10)) ?>...</small>
+                    <small>最大大小：<?= $DMS_CONFIG['upload_max_mb'] ?> MB | 允许类型：<?= implode(', ', array_slice($DMS_CONFIG['allowed_exts'], 0, 8)) ?>...</small>
                 </div>
 
-                <!-- Upload mode -->
-                <div class="form-group">
-                    <label for="upload_mode">上传模式</label>
-                    <select id="upload_mode" name="upload_mode">
-                        <option value="append">追加（保留所有版本）</option>
-                        <option value="overwrite">覆盖（替换，但保留历史）</option>
-                    </select>
-                    <small>注意：两种模式都保留版本历史。"覆盖"只是标记意图。</small>
-                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="upload_mode">上传模式</label>
+                        <select id="upload_mode" name="upload_mode">
+                            <option value="append">追加（保留所有版本）</option>
+                            <option value="overwrite">覆盖（替换，但保留历史）</option>
+                        </select>
+                        <small>两种模式都保留版本历史</small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="notes">版本说明</label>
-                    <input type="text" id="notes" name="notes" placeholder="关于此版本的可选说明">
+                    <div class="form-group">
+                        <label for="notes">版本说明</label>
+                        <input type="text" id="notes" name="notes" placeholder="关于此版本的可选说明">
+                    </div>
                 </div>
 
                 <div class="form-actions">
