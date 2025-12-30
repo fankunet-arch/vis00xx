@@ -67,6 +67,9 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
                         <dt>分类</dt>
                         <dd><?= dms_escape($doc['category_name'] ?? '无') ?></dd>
 
+                        <dt>项目</dt>
+                        <dd><?= dms_escape($doc['project_name'] ?? '无') ?></dd>
+
                         <dt>描述</dt>
                         <dd><?= $doc['description'] ? dms_escape($doc['description']) : '<em>无描述</em>' ?></dd>
 

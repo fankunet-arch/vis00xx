@@ -18,7 +18,13 @@ $is_admin = dms_has_role('admin');
         <nav class="header-nav">
             <a href="index.php?action=doc_list">文档列表</a>
             <?php if ($is_admin): ?>
-                <a href="index.php?action=category_list">分类管理</a>
+                <div class="nav-dropdown">
+                    <a href="#" class="nav-dropdown-toggle">设置 ▾</a>
+                    <div class="nav-dropdown-menu">
+                        <a href="index.php?action=category_list">分类管理</a>
+                        <a href="index.php?action=project_list">项目管理</a>
+                    </div>
+                </div>
             <?php endif; ?>
         </nav>
 

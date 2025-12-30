@@ -21,8 +21,9 @@ if ($is_new_version) {
     }
 }
 
-// Get categories
+// Get categories and projects
 $categories = dms_db_get_categories();
+$projects = dms_db_get_projects();
 
 ?>
 <!DOCTYPE html>
@@ -87,9 +88,21 @@ $categories = dms_db_get_categories();
                         </div>
 
                         <div class="form-group">
-                            <label for="tags">标签（用逗号分隔）</label>
-                            <input type="text" id="tags" name="tags" placeholder="例如：发票、2024、紧急">
+                            <label for="project_id">项目</label>
+                            <select id="project_id" name="project_id">
+                                <option value="">无</option>
+                                <?php foreach ($projects as $proj): ?>
+                                    <?php if ($proj['status'] === 'active'): ?>
+                                        <option value="<?= $proj['project_id'] ?>"><?= dms_escape($proj['name']) ?></option>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tags">标签（用逗号分隔）</label>
+                        <input type="text" id="tags" name="tags" placeholder="例如：发票、2024、紧急">
                     </div>
                 <?php endif; ?>
 

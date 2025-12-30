@@ -95,6 +95,7 @@ $categories = dms_db_get_categories();
                         <tr>
                             <th>标题</th>
                             <th>分类</th>
+                            <th>项目</th>
                             <th>标签</th>
                             <th>创建者</th>
                             <th>创建时间</th>
@@ -113,6 +114,7 @@ $categories = dms_db_get_categories();
                                     <?php endif; ?>
                                 </td>
                                 <td><?= dms_escape($doc['category_name'] ?? '-') ?></td>
+                                <td><?= dms_escape($doc['project_name'] ?? '-') ?></td>
                                 <td><?= dms_escape($doc['tags'] ?? '') ?></td>
                                 <td><?= dms_escape($doc['created_by_name'] ?? '未知') ?></td>
                                 <td><?= dms_format_datetime($doc['created_at'], 'Y-m-d H:i') ?></td>
