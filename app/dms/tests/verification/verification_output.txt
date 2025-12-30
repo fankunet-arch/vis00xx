@@ -1,0 +1,30 @@
+
+[TEST] Unauthorized Access to Download...
+[PASS] Redirected to login.
+
+[TEST] Login...
+[PASS] Login success.
+
+[TEST] Upload PDF...
+[PASS] Upload PDF success. Version ID: 7
+
+[TEST] Download PDF...
+[PASS] Download success.
+
+[TEST] Preview PDF...
+[PASS] Preview success.
+
+[TEST] Range PDF...
+[PASS] Range success.
+
+[TEST] Upload Safe TXT...
+[PASS] Upload Safe TXT success. Version ID: 8
+
+[TEST] Preview Safe TXT...
+[PASS] Content-Type is text/plain.
+[WARN] nosniff header MISSING.
+
+[TEST] Upload Unsafe TXT (Should Fail or Pass as text/plain)...
+[PASS] Upload Unsafe TXT rejected by server.
+
+=== ALL TESTS PASSED ===
