@@ -16,6 +16,7 @@
     --primary-hover: #4338ca;
     --primary-light: #6366f1;
     --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --primary-gradient-hover: linear-gradient(135deg, #5a67d8 0%, #603a88 100%);
 
     /* 辅助色 */
     --danger-color: #ef4444;
@@ -461,6 +462,7 @@ a:hover {
 
 .btn-primary:hover {
     color: white;
+    background: var(--primary-gradient-hover);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
     border-color: transparent;
