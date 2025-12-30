@@ -7,8 +7,12 @@
 // Define entry constant to prevent direct access to other files
 define('DMS_ENTRY', 1);
 
+// Define project root directory (parent of dc_html)
+// 定义项目根目录（dc_html的上级目录）
+define('PROJECT_ROOT', dirname(dirname(dirname(__DIR__))));
+
 // Load bootstrap
-require_once __DIR__ . '/../../../app/dms/bootstrap.php';
+require_once PROJECT_ROOT . '/app/dms/bootstrap.php';
 
 // =====================================================
 // Action Whitelist (Security: Only allowed actions)

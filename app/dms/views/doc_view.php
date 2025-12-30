@@ -13,13 +13,13 @@ $is_admin = dms_has_role('admin');
 // Get doc_id
 $doc_id = $_GET['doc_id'] ?? '';
 if (empty($doc_id) || !dms_validate_uuid($doc_id)) {
-    die('<h1>Invalid Document ID</h1>');
+    die('<h1>无效的文档ID</h1>');
 }
 
 // Get document
 $doc = dms_db_get_document($doc_id);
 if (!$doc || $doc['status'] === 'deleted') {
-    die('<h1>Document Not Found</h1>');
+    die('<h1>文档未找到</h1>');
 }
 
 // Get versions
@@ -31,7 +31,7 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -44,17 +44,17 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
 
         <main class="main-content">
             <div class="breadcrumb">
-                <a href="index.php?action=doc_list">Documents</a> / <?= dms_escape($doc['title']) ?>
+                <a href="index.php?action=doc_list">文档</a> / <?= dms_escape($doc['title']) ?>
             </div>
 
             <div class="page-header">
                 <h1><?= dms_escape($doc['title']) ?></h1>
                 <div class="page-actions">
                     <?php if ($can_upload): ?>
-                        <a href="index.php?action=doc_upload&doc_id=<?= dms_escape($doc_id) ?>" class="btn">Upload New Version</a>
+                        <a href="index.php?action=doc_upload&doc_id=<?= dms_escape($doc_id) ?>" class="btn">上传新版本</a>
                     <?php endif; ?>
                     <?php if ($is_admin): ?>
-                        <button onclick="deleteDocument('<?= dms_escape($doc_id) ?>')" class="btn btn-danger">Delete Document</button>
+                        <button onclick="deleteDocument('<?= dms_escape($doc_id) ?>')" class="btn btn-danger">删除文档</button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -62,30 +62,30 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
             <div class="doc-detail">
                 <!-- Metadata -->
                 <section class="detail-section">
-                    <h2>Information</h2>
+                    <h2>信息</h2>
                     <dl class="detail-list">
-                        <dt>Category</dt>
-                        <dd><?= dms_escape($doc['category_name'] ?? 'None') ?></dd>
+                        <dt>分类</dt>
+                        <dd><?= dms_escape($doc['category_name'] ?? '无') ?></dd>
 
-                        <dt>Description</dt>
-                        <dd><?= $doc['description'] ? dms_escape($doc['description']) : '<em>No description</em>' ?></dd>
+                        <dt>描述</dt>
+                        <dd><?= $doc['description'] ? dms_escape($doc['description']) : '<em>无描述</em>' ?></dd>
 
-                        <dt>Tags</dt>
-                        <dd><?= $doc['tags'] ? dms_escape($doc['tags']) : '<em>No tags</em>' ?></dd>
+                        <dt>标签</dt>
+                        <dd><?= $doc['tags'] ? dms_escape($doc['tags']) : '<em>无标签</em>' ?></dd>
 
-                        <dt>Created By</dt>
-                        <dd><?= dms_escape($doc['created_by_name'] ?? 'Unknown') ?> on <?= dms_format_datetime($doc['created_at'], 'Y-m-d H:i') ?></dd>
+                        <dt>创建者</dt>
+                        <dd><?= dms_escape($doc['created_by_name'] ?? '未知') ?> 于 <?= dms_format_datetime($doc['created_at'], 'Y-m-d H:i') ?></dd>
 
-                        <dt>Last Updated</dt>
+                        <dt>最后更新</dt>
                         <dd><?= dms_format_datetime($doc['updated_at'], 'Y-m-d H:i') ?></dd>
                     </dl>
 
                     <?php if (!empty($attributes) && $category_schema): ?>
-                        <h3>Custom Attributes</h3>
+                        <h3>自定义属性</h3>
                         <dl class="detail-list">
                             <?php foreach ($category_schema['fields'] ?? [] as $field): ?>
                                 <dt><?= dms_escape($field['name']) ?></dt>
-                                <dd><?= isset($attributes[$field['name']]) ? dms_escape($attributes[$field['name']]) : '<em>Not set</em>' ?></dd>
+                                <dd><?= isset($attributes[$field['name']]) ? dms_escape($attributes[$field['name']]) : '<em>未设置</em>' ?></dd>
                             <?php endforeach; ?>
                         </dl>
                     <?php endif; ?>
@@ -93,21 +93,21 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
 
                 <!-- Versions -->
                 <section class="detail-section">
-                    <h2>Versions (<?= count($versions) ?>)</h2>
+                    <h2>版本 (<?= count($versions) ?>)</h2>
 
                     <?php if (empty($versions)): ?>
-                        <p><em>No versions available.</em></p>
+                        <p><em>暂无版本。</em></p>
                     <?php else: ?>
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Version</th>
-                                    <th>File Name</th>
-                                    <th>Size</th>
-                                    <th>Type</th>
-                                    <th>Uploaded By</th>
-                                    <th>Uploaded At</th>
-                                    <th>Actions</th>
+                                    <th>版本</th>
+                                    <th>文件名</th>
+                                    <th>大小</th>
+                                    <th>类型</th>
+                                    <th>上传者</th>
+                                    <th>上传时间</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -116,7 +116,7 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
                                         <td>
                                             v<?= $ver['version_no'] ?>
                                             <?php if ($ver['is_current']): ?>
-                                                <span class="badge badge-primary">Current</span>
+                                                <span class="badge badge-primary">当前</span>
                                             <?php endif; ?>
                                         </td>
                                         <td><?= dms_escape($ver['original_file_name']) ?></td>
@@ -128,11 +128,11 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
                                             <?php
                                             $preview_type = dms_get_preview_type($ver['mime_type']);
                                             if ($preview_type): ?>
-                                                <a href="index.php?action=file_preview&version_id=<?= $ver['version_id'] ?>" target="_blank" class="btn-sm btn-preview">Preview</a>
+                                                <a href="index.php?action=file_preview&version_id=<?= $ver['version_id'] ?>" target="_blank" class="btn-sm btn-preview">预览</a>
                                             <?php endif; ?>
-                                            <a href="index.php?action=file_download&version_id=<?= $ver['version_id'] ?>" class="btn-sm btn-download">Download</a>
+                                            <a href="index.php?action=file_download&version_id=<?= $ver['version_id'] ?>" class="btn-sm btn-download">下载</a>
                                             <?php if ($is_admin && !$ver['is_current']): ?>
-                                                <button onclick="deleteVersion(<?= $ver['version_id'] ?>)" class="btn-sm btn-danger">Delete</button>
+                                                <button onclick="deleteVersion(<?= $ver['version_id'] ?>)" class="btn-sm btn-danger">删除</button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -149,7 +149,7 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
 
     <script>
     function deleteDocument(docId) {
-        if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+        if (!confirm('你确定要删除此文档吗？此操作无法撤销。')) {
             return;
         }
 
@@ -163,19 +163,19 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert('Document deleted successfully');
+                alert('文档已成功删除');
                 window.location.href = 'index.php?action=doc_list';
             } else {
-                alert('Error: ' + data.message);
+                alert('错误: ' + data.message);
             }
         })
         .catch(err => {
-            alert('Request failed: ' + err.message);
+            alert('请求失败: ' + err.message);
         });
     }
 
     function deleteVersion(versionId) {
-        if (!confirm('Are you sure you want to delete this version?')) {
+        if (!confirm('你确定要删除此版本吗？')) {
             return;
         }
 
@@ -189,14 +189,14 @@ $category_schema = !empty($doc['category_schema']) ? dms_json_decode($doc['categ
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert('Version deleted successfully');
+                alert('版本已成功删除');
                 location.reload();
             } else {
-                alert('Error: ' + data.message);
+                alert('错误: ' + data.message);
             }
         })
         .catch(err => {
-            alert('Request failed: ' + err.message);
+            alert('请求失败: ' + err.message);
         });
     }
     </script>

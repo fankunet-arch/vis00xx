@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS `dms_deleted_object_queue` (
 INSERT INTO `dms_users`
   (`username`, `email`, `password_hash`, `full_name`, `role`, `org_id`, `is_active`)
 VALUES
-  ('admin', 'admin@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'admin', 1, 1)
+  ('admin', 'admin@example.com', '$2y$10$0gbrPzoIXWlgSD6a0jEAOOHLDFtPCM36lpMg0jwk/gkzwKSiws5SG', 'System Administrator', 'admin', 1, 1)
 ON DUPLICATE KEY UPDATE `user_id`=`user_id`;
 
 -- =====================================================

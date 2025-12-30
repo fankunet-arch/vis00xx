@@ -42,7 +42,7 @@ return [
     // Upload Configuration
     // =====================================================
     'upload_max_mb' => 100, // Maximum file size in MB
-    'upload_tmp_dir' => '/home/user/vis00xx/app/dms/tmp/upload',
+    'upload_tmp_dir' => (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(dirname(__DIR__))) . '/app/dms/tmp/upload',
 
     // Allowed file extensions (lowercase)
     'allowed_exts' => [
@@ -131,9 +131,9 @@ return [
     'per_page_options' => [10, 25, 50, 100],
 
     // =====================================================
-    // Paths (Auto-calculated, don't modify)
+    // Paths (Auto-calculated based on PROJECT_ROOT)
     // =====================================================
-    'path_app' => '/home/user/vis00xx/app/dms',
-    'path_public' => '/home/user/vis00xx/dc_html/dms',
+    'path_app' => (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(dirname(__DIR__))) . '/app/dms',
+    'path_public' => (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(dirname(__DIR__))) . '/dc_html/dms',
     'url_base' => '/dc_html/dms/ap', // Adjust based on web server config
 ];
