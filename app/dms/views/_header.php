@@ -12,22 +12,25 @@ $is_admin = dms_has_role('admin');
 <header class="site-header">
     <div class="header-container">
         <div class="header-logo">
-            <a href="index.php?action=doc_list">DMS Archive</a>
+            <a href="index.php?action=doc_list">DMS 档案系统</a>
         </div>
 
         <nav class="header-nav">
-            <a href="index.php?action=doc_list">Documents</a>
+            <a href="index.php?action=doc_list">文档列表</a>
             <?php if ($is_admin): ?>
-                <a href="index.php?action=category_list">Categories</a>
+                <a href="index.php?action=category_list">分类管理</a>
             <?php endif; ?>
         </nav>
 
         <div class="header-user">
             <span class="user-name">
                 <?= dms_escape($current_user['full_name'] ?? $current_user['username']) ?>
-                <small>(<?= dms_escape($current_user['role']) ?>)</small>
+                <small>(<?php
+                    $role_map = ['admin' => '管理员', 'user' => '用户', 'viewer' => '访客'];
+                    echo $role_map[$current_user['role']] ?? $current_user['role'];
+                ?>)</small>
             </span>
-            <a href="index.php?action=do_logout" class="btn-sm">Logout</a>
+            <a href="index.php?action=do_logout" class="btn btn-sm">退出</a>
         </div>
     </div>
 </header>

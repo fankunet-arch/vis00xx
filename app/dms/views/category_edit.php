@@ -31,7 +31,7 @@ $schema_json = $category['schema_json'] ?? '{"fields":[]}';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $is_edit ? 'Edit' : 'Create' ?> Category - DMS Archive System</title>
+    <title><?= $is_edit ? '编辑' : '创建' ?> 分类 - DMS Archive System</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -40,11 +40,11 @@ $schema_json = $category['schema_json'] ?? '{"fields":[]}';
 
         <main class="main-content">
             <div class="breadcrumb">
-                <a href="index.php?action=category_list">Categories</a> / <?= $is_edit ? 'Edit' : 'Create' ?>
+                <a href="index.php?action=category_list">分类列表</a> / <?= $is_edit ? '编辑' : '创建' ?>
             </div>
 
             <div class="page-header">
-                <h1><?= $is_edit ? 'Edit Category' : 'Create New Category' ?></h1>
+                <h1><?= $is_edit ? '编辑分类' : '创建新分类' ?></h1>
             </div>
 
             <form id="categoryForm" class="category-form">
@@ -53,21 +53,21 @@ $schema_json = $category['schema_json'] ?? '{"fields":[]}';
                 <?php endif; ?>
 
                 <div class="form-group">
-                    <label for="name">Category Name *</label>
+                    <label for="name">分类名称 *</label>
                     <input type="text" id="name" name="name" value="<?= dms_escape($name) ?>" required maxlength="100">
                 </div>
 
                 <div class="form-group">
-                    <label for="description">Description</label>
+                    <label for="description">描述</label>
                     <textarea id="description" name="description" rows="3"><?= dms_escape($description) ?></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label for="schema_json">Schema (JSON)</label>
+                    <label for="schema_json">元数据架构 (JSON)</label>
                     <textarea id="schema_json" name="schema_json" rows="15" class="code-editor"><?= dms_escape($schema_json) ?></textarea>
-                    <small>Define custom fields for documents in this category.</small>
+                    <small>为此分类中的文档定义自定义字段。</small>
                     <details>
-                        <summary>Schema Format Example</summary>
+                        <summary>架构格式示例</summary>
                         <pre>{
   "fields": [
     {
@@ -98,13 +98,13 @@ $schema_json = $category['schema_json'] ?? '{"fields":[]}';
     }
   ]
 }</pre>
-                        <p>Supported types: text, number, date, enum, bool</p>
+                        <p>支持的类型：text, number, date, enum, bool</p>
                     </details>
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="submitBtn">Save Category</button>
-                    <a href="index.php?action=category_list" class="btn">Cancel</a>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">保存分类</button>
+                    <a href="index.php?action=category_list" class="btn">取消</a>
                 </div>
 
                 <div id="result" class="result"></div>
@@ -129,7 +129,7 @@ $schema_json = $category['schema_json'] ?? '{"fields":[]}';
                 JSON.parse(schemaJson);
             }
         } catch (err) {
-            result.innerHTML = '<div class="alert alert-error">Invalid JSON in schema: ' + err.message + '</div>';
+            result.innerHTML = '<div class="alert alert-error">架构中的JSON无效：' + err.message + '</div>';
             return;
         }
 
@@ -148,12 +148,12 @@ $schema_json = $category['schema_json'] ?? '{"fields":[]}';
                     window.location.href = 'index.php?action=category_list';
                 }, 1000);
             } else {
-                result.innerHTML = '<div class="alert alert-error">Error: ' + data.message + '</div>';
+                result.innerHTML = '<div class="alert alert-error">错误：' + data.message + '</div>';
                 submitBtn.disabled = false;
             }
         })
         .catch(err => {
-            result.innerHTML = '<div class="alert alert-error">Request failed: ' + err.message + '</div>';
+            result.innerHTML = '<div class="alert alert-error">请求失败：' + err.message + '</div>';
             submitBtn.disabled = false;
         });
     });

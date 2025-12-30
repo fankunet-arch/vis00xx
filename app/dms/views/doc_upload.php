@@ -17,7 +17,7 @@ $doc = null;
 if ($is_new_version) {
     $doc = dms_db_get_document($doc_id);
     if (!$doc || $doc['status'] === 'deleted') {
-        die('<h1>Document Not Found</h1>');
+        die('<h1>文档未找到</h1>');
     }
 }
 
@@ -26,11 +26,11 @@ $categories = dms_db_get_categories();
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $is_new_version ? 'Upload New Version' : 'Upload Document' ?> - DMS Archive System</title>
+    <title><?= $is_new_version ? '上传新版本' : '上传文档' ?> - DMS Archive System</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -39,17 +39,17 @@ $categories = dms_db_get_categories();
 
         <main class="main-content">
             <div class="breadcrumb">
-                <a href="index.php?action=doc_list">Documents</a> /
+                <a href="index.php?action=doc_list">文档</a> /
                 <?php if ($is_new_version): ?>
                     <a href="index.php?action=doc_view&doc_id=<?= dms_escape($doc_id) ?>"><?= dms_escape($doc['title']) ?></a> /
-                    Upload New Version
+                    上传新版本
                 <?php else: ?>
-                    Upload New Document
+                    上传新文档
                 <?php endif; ?>
             </div>
 
             <div class="page-header">
-                <h1><?= $is_new_version ? 'Upload New Version' : 'Upload New Document' ?></h1>
+                <h1><?= $is_new_version ? '上传新版本' : '上传新文档' ?></h1>
             </div>
 
             <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
@@ -58,25 +58,25 @@ $categories = dms_db_get_categories();
 
                     <!-- Show existing document info -->
                     <div class="info-box">
-                        <h3>Uploading new version for: <?= dms_escape($doc['title']) ?></h3>
+                        <h3>正在上传新版本：<?= dms_escape($doc['title']) ?></h3>
                         <p><?= dms_escape($doc['description']) ?></p>
                     </div>
                 <?php else: ?>
                     <!-- New document fields -->
                     <div class="form-group">
-                        <label for="title">Document Title *</label>
+                        <label for="title">文档标题 *</label>
                         <input type="text" id="title" name="title" required>
                     </div>
 
                     <div class="form-group">
-                        <label for="description">Description</label>
+                        <label for="description">描述</label>
                         <textarea id="description" name="description" rows="4"></textarea>
                     </div>
 
                     <div class="form-group">
-                        <label for="category_id">Category</label>
+                        <label for="category_id">分类</label>
                         <select id="category_id" name="category_id">
-                            <option value="">None</option>
+                            <option value="">无</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>"><?= dms_escape($cat['name']) ?></option>
                             <?php endforeach; ?>
@@ -84,44 +84,44 @@ $categories = dms_db_get_categories();
                     </div>
 
                     <div class="form-group">
-                        <label for="tags">Tags (comma-separated)</label>
-                        <input type="text" id="tags" name="tags" placeholder="e.g., invoice, 2024, urgent">
+                        <label for="tags">标签（用逗号分隔）</label>
+                        <input type="text" id="tags" name="tags" placeholder="例如：发票、2024、紧急">
                     </div>
                 <?php endif; ?>
 
                 <!-- File upload -->
                 <div class="form-group">
-                    <label for="file">File *</label>
+                    <label for="file">文件 *</label>
                     <input type="file" id="file" name="file" required>
-                    <small>Maximum size: <?= $DMS_CONFIG['upload_max_mb'] ?> MB</small>
-                    <small>Allowed types: <?= implode(', ', array_slice($DMS_CONFIG['allowed_exts'], 0, 10)) ?>...</small>
+                    <small>最大大小：<?= $DMS_CONFIG['upload_max_mb'] ?> MB</small>
+                    <small>允许的类型：<?= implode(', ', array_slice($DMS_CONFIG['allowed_exts'], 0, 10)) ?>...</small>
                 </div>
 
                 <!-- Upload mode -->
                 <div class="form-group">
-                    <label for="upload_mode">Upload Mode</label>
+                    <label for="upload_mode">上传模式</label>
                     <select id="upload_mode" name="upload_mode">
-                        <option value="append">Append (keep all versions)</option>
-                        <option value="overwrite">Overwrite (replace, but keep history)</option>
+                        <option value="append">追加（保留所有版本）</option>
+                        <option value="overwrite">覆盖（替换，但保留历史）</option>
                     </select>
-                    <small>Note: Both modes keep version history. "Overwrite" just marks the intent.</small>
+                    <small>注意：两种模式都保留版本历史。"覆盖"只是标记意图。</small>
                 </div>
 
                 <div class="form-group">
-                    <label for="notes">Version Notes</label>
-                    <input type="text" id="notes" name="notes" placeholder="Optional notes about this version">
+                    <label for="notes">版本说明</label>
+                    <input type="text" id="notes" name="notes" placeholder="关于此版本的可选说明">
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="submitBtn">Upload</button>
-                    <a href="<?= $is_new_version ? 'index.php?action=doc_view&doc_id=' . dms_escape($doc_id) : 'index.php?action=doc_list' ?>" class="btn">Cancel</a>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">上传</button>
+                    <a href="<?= $is_new_version ? 'index.php?action=doc_view&doc_id=' . dms_escape($doc_id) : 'index.php?action=doc_list' ?>" class="btn">取消</a>
                 </div>
 
                 <div id="uploadProgress" class="upload-progress" style="display: none;">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
-                    <p id="progressText">Uploading...</p>
+                    <p id="progressText">正在上传...</p>
                 </div>
 
                 <div id="uploadResult" class="upload-result"></div>
@@ -156,19 +156,19 @@ $categories = dms_db_get_categories();
         .then(data => {
             if (data.success) {
                 result.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
-                progressText.textContent = 'Upload completed!';
+                progressText.textContent = '上传完成！';
 
                 setTimeout(() => {
                     window.location.href = 'index.php?action=doc_view&doc_id=' + data.data.doc_id;
                 }, 1500);
             } else {
-                result.innerHTML = '<div class="alert alert-error">Error: ' + data.message + '</div>';
+                result.innerHTML = '<div class="alert alert-error">错误：' + data.message + '</div>';
                 submitBtn.disabled = false;
                 progress.style.display = 'none';
             }
         })
         .catch(err => {
-            result.innerHTML = '<div class="alert alert-error">Request failed: ' + err.message + '</div>';
+            result.innerHTML = '<div class="alert alert-error">请求失败：' + err.message + '</div>';
             submitBtn.disabled = false;
             progress.style.display = 'none';
         });

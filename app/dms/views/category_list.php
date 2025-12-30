@@ -12,11 +12,11 @@ $categories = dms_db_get_categories();
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Categories - DMS Archive System</title>
+    <title>分类管理 - DMS 档案管理系统</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -25,26 +25,26 @@ $categories = dms_db_get_categories();
 
         <main class="main-content">
             <div class="page-header">
-                <h1>Categories</h1>
+                <h1>分类管理</h1>
                 <div class="page-actions">
-                    <a href="index.php?action=category_edit" class="btn btn-primary">Create New Category</a>
+                    <a href="index.php?action=category_edit" class="btn btn-primary">创建新分类</a>
                 </div>
             </div>
 
             <?php if (empty($categories)): ?>
                 <div class="empty-state">
-                    <p>No categories found.</p>
-                    <a href="index.php?action=category_edit" class="btn btn-primary">Create First Category</a>
+                    <p>未找到分类。</p>
+                    <a href="index.php?action=category_edit" class="btn btn-primary">创建第一个分类</a>
                 </div>
             <?php else: ?>
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Description</th>
-                            <th>Schema Fields</th>
-                            <th>Created</th>
-                            <th>Actions</th>
+                            <th>名称</th>
+                            <th>描述</th>
+                            <th>字段数量</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -56,10 +56,10 @@ $categories = dms_db_get_categories();
                             <tr>
                                 <td><strong><?= dms_escape($cat['name']) ?></strong></td>
                                 <td><?= dms_escape($cat['description'] ?? '') ?></td>
-                                <td><?= $field_count ?> field<?= $field_count !== 1 ? 's' : '' ?></td>
+                                <td><?= $field_count ?> 个字段</td>
                                 <td><?= dms_format_datetime($cat['created_at'], 'Y-m-d H:i') ?></td>
                                 <td class="actions">
-                                    <a href="index.php?action=category_edit&category_id=<?= $cat['category_id'] ?>" class="btn-sm">Edit</a>
+                                    <a href="index.php?action=category_edit&category_id=<?= $cat['category_id'] ?>" class="btn btn-sm">编辑</a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

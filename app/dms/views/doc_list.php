@@ -33,11 +33,11 @@ $categories = dms_db_get_categories();
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documents - DMS Archive System</title>
+    <title>文档列表 - DMS 档案管理系统</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -46,26 +46,28 @@ $categories = dms_db_get_categories();
 
         <main class="main-content">
             <div class="page-header">
-                <h1>Documents</h1>
+                <h1>文档列表</h1>
                 <div class="page-actions">
                     <?php if ($can_upload): ?>
-                        <a href="index.php?action=doc_upload" class="btn btn-primary">Upload New Document</a>
+                        <a href="index.php?action=doc_upload" class="btn btn-primary">上传新文档</a>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <!-- Filters -->
+            <!-- 筛选表单 -->
             <form method="GET" action="index.php" class="filter-form">
                 <input type="hidden" name="action" value="doc_list">
 
                 <div class="filter-row">
                     <div class="filter-group">
-                        <input type="text" name="search" placeholder="Search title, description, tags..." value="<?= dms_escape($_GET['search'] ?? '') ?>">
+                        <label>搜索</label>
+                        <input type="text" name="search" placeholder="搜索标题、描述、标签..." value="<?= dms_escape($_GET['search'] ?? '') ?>">
                     </div>
 
                     <div class="filter-group">
+                        <label>分类</label>
                         <select name="category_id">
-                            <option value="">All Categories</option>
+                            <option value="">全部分类</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?= $cat['category_id'] ?>" <?= ($filters['category_id'] ?? 0) == $cat['category_id'] ? 'selected' : '' ?>>
                                     <?= dms_escape($cat['name']) ?>
@@ -74,29 +76,29 @@ $categories = dms_db_get_categories();
                         </select>
                     </div>
 
-                    <button type="submit" class="btn">Filter</button>
-                    <a href="index.php?action=doc_list" class="btn">Clear</a>
+                    <button type="submit" class="btn btn-primary">筛选</button>
+                    <a href="index.php?action=doc_list" class="btn">清空</a>
                 </div>
             </form>
 
-            <!-- Documents Table -->
+            <!-- 文档表格 -->
             <?php if (empty($documents)): ?>
                 <div class="empty-state">
-                    <p>No documents found.</p>
+                    <p>未找到文档。</p>
                     <?php if ($can_upload): ?>
-                        <a href="index.php?action=doc_upload" class="btn btn-primary">Upload First Document</a>
+                        <a href="index.php?action=doc_upload" class="btn btn-primary">上传第一个文档</a>
                     <?php endif; ?>
                 </div>
             <?php else: ?>
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Title</th>
-                            <th>Category</th>
-                            <th>Tags</th>
-                            <th>Created By</th>
-                            <th>Created At</th>
-                            <th>Actions</th>
+                            <th>标题</th>
+                            <th>分类</th>
+                            <th>标签</th>
+                            <th>创建者</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -112,27 +114,27 @@ $categories = dms_db_get_categories();
                                 </td>
                                 <td><?= dms_escape($doc['category_name'] ?? '-') ?></td>
                                 <td><?= dms_escape($doc['tags'] ?? '') ?></td>
-                                <td><?= dms_escape($doc['created_by_name'] ?? 'Unknown') ?></td>
+                                <td><?= dms_escape($doc['created_by_name'] ?? '未知') ?></td>
                                 <td><?= dms_format_datetime($doc['created_at'], 'Y-m-d H:i') ?></td>
                                 <td class="actions">
-                                    <a href="index.php?action=doc_view&doc_id=<?= dms_escape($doc['doc_id']) ?>" class="btn-sm">View</a>
+                                    <a href="index.php?action=doc_view&doc_id=<?= dms_escape($doc['doc_id']) ?>" class="btn btn-sm">查看</a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
 
-                <!-- Pagination -->
+                <!-- 分页 -->
                 <?php if ($total_pages > 1): ?>
                     <div class="pagination">
                         <?php if ($page > 1): ?>
-                            <a href="?action=doc_list&page=<?= $page - 1 ?><?= !empty($filters) ? '&' . http_build_query($filters) : '' ?>" class="btn-sm">Previous</a>
+                            <a href="?action=doc_list&page=<?= $page - 1 ?><?= !empty($filters) ? '&' . http_build_query($filters) : '' ?>" class="btn btn-sm">上一页</a>
                         <?php endif; ?>
 
-                        <span>Page <?= $page ?> of <?= $total_pages ?></span>
+                        <span>第 <?= $page ?> 页 / 共 <?= $total_pages ?> 页</span>
 
                         <?php if ($page < $total_pages): ?>
-                            <a href="?action=doc_list&page=<?= $page + 1 ?><?= !empty($filters) ? '&' . http_build_query($filters) : '' ?>" class="btn-sm">Next</a>
+                            <a href="?action=doc_list&page=<?= $page + 1 ?><?= !empty($filters) ? '&' . http_build_query($filters) : '' ?>" class="btn btn-sm">下一页</a>
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
