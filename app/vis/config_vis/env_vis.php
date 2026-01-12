@@ -24,22 +24,22 @@ define('VIS_DB_CHARSET', 'utf8mb4');
 // QNAP QuObjects S3 配置
 // ============================================
 // 1. QNAP Access Key
-define('VIS_R2_ACCESS_KEY_ID', 'QuObjects:pFeTuLvjgBpSWukM8eX4'); 
+define('VIS_R2_ACCESS_KEY_ID', 'QuObjects:7qzs7Cmr2R4Ch863DwAW'); 
 
 // 2. QNAP Secret Key
-define('VIS_R2_SECRET_ACCESS_KEY', 'tybrN0C7CxUA81cafLlH5382mzTea96V'); 
+define('VIS_R2_SECRET_ACCESS_KEY', 'jijPB10hGPGUigccXyPoKyorELIl11DS'); 
 
 // 3. 存储桶名称
 define('VIS_R2_BUCKET_NAME', 'vis-videos'); 
 
 // 4. QNAP S3 服务地址 (后台上传用)
-define('VIS_R2_ENDPOINT', 'http://192.168.1.128:8010'); 
+define('VIS_R2_ENDPOINT', 'http://192.168.1.129:8010'); 
 
 // 5. 区域 (默认)
 define('VIS_R2_REGION', 'us-east-1');
 
 // 6. 公共访问域名 (前台显示用)
-define('VIS_R2_PUBLIC_URL', 'http://192.168.1.128:8010/v1/AUTH_QuObjects/vis-videos');
+define('VIS_R2_PUBLIC_URL', 'http://192.168.1.129:8010/v1/AUTH_QuObjects/dms');
 
 // 签名URL有效期
 define('VIS_SIGNED_URL_EXPIRES', 300);
